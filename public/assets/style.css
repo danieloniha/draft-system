@@ -1,0 +1,367 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #f4f4f4;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 40px;
+    max-width: 80%;
+    margin: 0 auto;
+}
+
+.box {
+    background-color: #007BFF;
+    color: #ffffff;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+    height: 120px; /* Reduced height */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.box:hover {
+    background-color: #0056b3;
+}
+
+.box.blurred {
+    background-color: #ccc; /* Gray out the card */
+    cursor: not-allowed;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.box.selected {
+    opacity: 0.5;
+    pointer-events: none;
+    background-color: #ccc;
+}
+
+/* Highlight the current player in the list */
+.current-pick-indicator {
+    color: green;
+    font-weight: bold;
+}
+
+.current-player {
+    text-align: center;
+    margin-bottom: 20px;
+    position: absolute; /* Absolute positioning */
+    top: 20px; /* Positioned 20px from the top */
+    left: 50%; /* Center horizontally */
+    transform: translateX(-50%);
+}
+
+.current-player h2 {
+    font-size: 22px;
+    color: #007BFF;
+}
+
+/* Styling for the Logout Button */
+.logout-form {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+}
+
+.btn-logout {
+    color: grey;
+    padding: 8px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn-logout:hover {
+    background-color: rgb(59, 59, 59);
+}
+
+.form-container {
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 400px;
+    margin: 20px;
+}
+
+.form-title {
+    margin-bottom: 20px;
+    font-size: 24px;
+    text-align: center;
+    color: #333;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #555;
+}
+
+.form-group select {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #555;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+
+.form-group input[type="number"]::-webkit-inner-spin-button,
+.form-group input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.form-group .btn {
+    background-color: #007BFF;
+    color: #fff;
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    width: 100%;
+}
+
+.form-group .btn:hover {
+    background-color: #0056b3;
+}
+
+/* New Styles for Draft Selection Page */
+.user-greeting {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 24px;
+    color: #333;
+}
+
+.draft-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 50px;
+}
+
+.draft-box {
+    width: 320px;
+    height: 100px;
+    margin: 15px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #0059A5;
+    color: white;
+    font-size: 18px;
+    border-radius: 8px;
+    text-align: center;
+    transition: background-color 0.3s ease;
+}
+
+.draft-box a {
+    color: white;
+    text-decoration: none;
+    display: block;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.draft-box:hover {
+    background-color: #004080;
+}
+
+/* Table Styles */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    background-color: #ffffff;
+}
+
+table th,
+table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+table th {
+    background-color: #004896;
+    color: #ffffff;
+}
+
+table tr:hover {
+    background-color: #f1f1f1;
+}
+
+/* Player List Styles */
+.player-list {
+    max-width: 300px;
+    margin: 0 auto;
+    padding: 20px;
+    border-radius: 10px;
+    background-color: #f8f9fa;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.player-list h2 {
+    margin-bottom: 15px;
+    font-size: 24px;
+    color: #343a40;
+}
+
+#player-list {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+#player-list li {
+    padding: 10px 15px;
+    margin-bottom: 10px;
+    background-color: #ffffff;
+    border-radius: 5px;
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 18px;
+    color: #495057;
+    transition: background-color 0.3s ease;
+}
+
+#player-list li:hover {
+    background-color: #f1f3f5;
+}
+
+#player-list li strong {
+    color: #007bff;
+    margin-right: 10px;
+}
+
+.current-pick-indicator {
+    color: #28a745;
+    font-size: 14px;
+    font-weight: bold;
+    display: none; /* Default hidden, will show when it's the player's turn */
+}
+
+/* When it's the current player's turn, highlight the player */
+#player-list li.current-turn {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+/* Responsive design for mobile */
+@media (max-width: 600px) {
+    .player-list {
+        max-width: 100%;
+        padding: 15px;
+    }
+
+    #player-list li {
+        font-size: 16px;
+    }
+}
+
+
+/* Paragraph Styles */
+p {
+    margin-bottom: 15px;
+    color: #333;
+    line-height: 1.6;
+    font-size: 16px;
+}
+
+/* Link Styles */
+a {
+    color: #007BFF;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+    color: #0056b3;
+}
+
+
+/* Responsive behavior */
+@media (max-width: 1024px) {
+    .container {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .container {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .container {
+        grid-template-columns: repeat(1, 1fr);
+    }
+
+    .form-container {
+        padding: 15px;
+        margin: 10px;
+    }
+
+    .form-title {
+        font-size: 20px;
+    }
+
+    .form-group input {
+        padding: 8px;
+    }
+
+    .form-group .btn {
+        padding: 8px;
+        font-size: 14px;
+    }
+}
