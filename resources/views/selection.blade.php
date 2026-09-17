@@ -4,21 +4,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Map Pick</title>
+    <title>Item Selection</title>
     <link rel="stylesheet" href="{{ asset('/assets/style.css') }}">
 </head>
 
 <body>
 
     <div id="current-player" class="current-player">
-        <h2>Waiting for <span id="player-name">Player 1</span> to select an interest...</h2>
+        <h2>Waiting for <span id="player-name">Player 1</span> to select an item...</h2>
     </div>
 
-    <div class="container">
+    <div class="container item-grid">
         @foreach ($interests as $interest)
-            <div class="box select-interest" id="interest-{{ $interest->id }}" data-id="{{ $interest->id }}"
+            <div class="box item-card select-interest {{ in_array($interest->id, $selectedInterestIds) ? 'blurred' : '' }}" id="interest-{{ $interest->id }}" data-id="{{ $interest->id }}"
                 data-interest="{{ $interest->name }}">
-                {{ $interest->name }}
+                @if ($interest->image_path)
+                    <img src="{{ asset('storage/' . $interest->image_path) }}" alt="{{ $interest->name }}">
+                @endif
+                <span>{{ $interest->name }}</span>
             </div>
         @endforeach
     </div>
@@ -48,6 +51,10 @@
 
             let currentSelectionNo = 1; // Initialize with the first player’s selection_no
             let totalPlayers = {{ $totalPlayers }}; // Total number of players
+            const serverCurrentPlayer = players.find(player => player.id === @json($currentPlayerId));
+            if (serverCurrentPlayer) {
+                currentSelectionNo = serverCurrentPlayer.selection_no;
+            }
 
             // Update the player display on page load
             updateCurrentPlayerDisplay(currentSelectionNo);
@@ -79,8 +86,8 @@
                                 // Update the board visually (blur the picked card)
                                 $(`#interest-${interestId}`).addClass('blurred');
 
-                                // Move to the next player
-                                updatePlayerTurn();
+                                currentSelectionNo = response.next_player.selection_no;
+                                updateCurrentPlayerDisplay(currentSelectionNo);
                             } else {
                                 alert("Error: " + response.message);
                             }

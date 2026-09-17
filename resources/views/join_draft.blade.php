@@ -15,7 +15,7 @@
             @csrf
             <div class="form-group">
                 <label for="token">Enter Token</label>
-                <input type="text" id="token" name="token" placeholder="Enter your invitation token" required>
+                <input type="text" id="token" name="token" value="{{ old('token', $token) }}" placeholder="Enter your invitation token" required>
             </div>
 
             <div class="form-group">

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Draft;
 use App\Models\Team;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -19,31 +18,35 @@ class TeamController extends Controller
 
     public function inviteTeams(Request $request, $draft_id)
     {
-        // Validate email input
-        $request->validate([
-            'username' => 'required|array|min:1',
-            'username.*' => 'required|string'
+        $validated = $request->validate([
+            'emails' => ['required', 'array', 'min:1'],
+            'emails.*' => ['required', 'email', 'distinct'],
         ]);
 
         $draft = Draft::findOrFail($draft_id);
 
-        // For each email, create a team and generate a token for that team
-        foreach ($request->username as $username) {
-            $user = User::where('username', $username)->first();
-            $token = Str::random(32); // Generate a random token for the team
+        // An invitation may be sent before the participant has an account.
+        foreach ($validated['emails'] as $email) {
+            $token = Str::random(32);
 
-            $team = Team::create([
-                'user_id' => $user->id, // Will be updated when user joins with the token
+            Team::create([
+                'user_id' => null,
+                'email' => $email,
                 'draft_id' => $draft->id,
-                'selection_no' => null, // Can be updated later when team order is assigned
+                'selection_no' => null,
                 'token' => $token,
             ]);
-
-            // Send the email with the invitation link
-            //Mail::to($email)->send(new TeamInviteMail($team, $draft));
         }
 
-        return redirect()->route('show.selection.order', ['draft_id' => $draft_id]);
+        return redirect()->route('invitations.sent', ['draft_id' => $draft_id]);
+    }
+
+    public function showInvitationsSent($draft_id)
+    {
+        $draft = Draft::findOrFail($draft_id);
+        $teams = $draft->teams()->orderBy('id')->get();
+
+        return view('invitations_sent', compact('draft', 'teams'));
     }
 
     public function showSelectionForm($draft_id)
@@ -80,7 +83,13 @@ class TeamController extends Controller
                 'selection_no' => $selection_no,
             ]);
         }
+        return redirect()->route('draft.created', ['draft_id' => $draft_id]);
+    }
 
-        //return redirect()->route('some.next.route')->with('success', 'Selection order saved successfully!');
+    public function showDraftCreated($draft_id)
+    {
+        $draft = Draft::findOrFail($draft_id);
+
+        return view('draft_created', compact('draft'));
     }
 }

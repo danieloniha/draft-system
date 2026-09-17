@@ -38,7 +38,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/create/draft', [DraftController::class, 'createDraft'])->name('create.draft');
 
     Route::get('/draft/{draft_id}/interests/{no_of_interests}', [DraftController::class, 'showInterestForm'])->name('add.interests.form');
-    Route::post('/draft/{draft_id}/interests', [DraftController::class, 'storeInterests'])->name('store.interests');  
+    Route::post('/draft/{draft_id}/interests', [DraftController::class, 'storeInterests'])->name('store.interests');
 
     Route::get('/join-draft', [DraftController::class, 'showJoinDraftForm'])->name('join.draft.form');
     Route::post('/join-draft', [DraftController::class, 'joinDraft'])->name('join.draft');
@@ -47,14 +47,17 @@ Route::middleware('auth')->group(function () {
     Route::post('/draft/{draft_id}/start', [DraftController::class, 'startDraft'])->name('start.draft');
 
     Route::get('/draft/{draft_id}/interests', [DraftController::class, 'showInterests'])->name('show.interests');
-    Route::post('/draft/{draft_id}/interests', [DraftController::class, 'selectInterest'])->name('select.interest');
+    Route::post('/draft/{draft_id}/interests', [DraftController::class, 'storeInterests'])->name('store.interests');
+    Route::post('/draft/{draft_id}/interest', [DraftController::class, 'selectInterest'])->name('select.interest');
 });
 
 Route::middleware('auth')->group(function () {
     Route::get('/draft/{draft_id}/teams/{no_of_teams}', [TeamController::class, 'showInviteForm'])->name('add.teams.form');
     Route::post('/draft/{draft_id}/teams', [TeamController::class, 'inviteTeams'])->name('invite.teams');
+    Route::get('/draft/{draft_id}/invitations-sent', [TeamController::class, 'showInvitationsSent'])->name('invitations.sent');
     Route::get('/draft/{draft_id}/selection-order', [TeamController::class, 'showSelectionForm'])->name('show.selection.order');
     Route::post('/draft/{draft_id}/store-selection-order', [TeamController::class, 'storeSelectionOrder'])->name('store.selection.order');
+    Route::get('/draft/{draft_id}/created', [TeamController::class, 'showDraftCreated'])->name('draft.created');
 });
 
 require __DIR__.'/auth.php';

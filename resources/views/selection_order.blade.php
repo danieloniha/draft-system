@@ -25,7 +25,7 @@
             @foreach ($teams as $team)
                 <div class="form-group">
                     <label for="selection_no_{{ $team->id }}">
-                        Selection Number for {{ $team->user->username }}
+                        Selection Number for {{ $team->user?->username ?? $team->email }}
                     </label>
 
                     <!-- Dropdown for selecting the number (1 to N) -->
