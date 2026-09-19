@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DraftController;
+use App\Http\Controllers\DraftEditController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Route;
@@ -21,9 +23,7 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', DashboardController::class)->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -49,6 +49,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/draft/{draft_id}/interests', [DraftController::class, 'showInterests'])->name('show.interests');
     Route::post('/draft/{draft_id}/interests', [DraftController::class, 'storeInterests'])->name('store.interests');
     Route::post('/draft/{draft_id}/interest', [DraftController::class, 'selectInterest'])->name('select.interest');
+    Route::get('/draft/{draft_id}/state', [DraftController::class, 'showState'])->middleware('throttle:120,1')->name('draft.state');
 });
 
 Route::middleware('auth')->group(function () {
@@ -58,6 +59,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/draft/{draft_id}/selection-order', [TeamController::class, 'showSelectionForm'])->name('show.selection.order');
     Route::post('/draft/{draft_id}/store-selection-order', [TeamController::class, 'storeSelectionOrder'])->name('store.selection.order');
     Route::get('/draft/{draft_id}/created', [TeamController::class, 'showDraftCreated'])->name('draft.created');
+
+    // The host changing a draft before it starts.
+    Route::get('/draft/{draft_id}/edit', [DraftEditController::class, 'edit'])->name('draft.edit');
+    Route::patch('/draft/{draft_id}', [DraftEditController::class, 'update'])->name('draft.update');
+    Route::patch('/draft/{draft_id}/items/{interest_id}', [DraftEditController::class, 'updateItem'])->name('draft.items.update');
+    Route::delete('/draft/{draft_id}/items/{interest_id}', [DraftEditController::class, 'removeItem'])->name('draft.items.destroy');
+    Route::delete('/draft/{draft_id}/participants/{team_id}', [DraftEditController::class, 'removeParticipant'])->name('draft.participants.destroy');
 });
 
 require __DIR__.'/auth.php';

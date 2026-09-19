@@ -20,6 +20,10 @@ A draft can be created by a user through the **Create Draft** action.
 
 The person who creates the draft is the draft creator/owner and is responsible for configuring the draft.
 
+The owner is also the **host**: nobody can select anything until the host starts the draft, and only the host can start it. The owner and the participants can see the draft's details; only the owner can see the participants' emails and invitation links.
+
+The host can open the picking page to watch the draft live even if they are not also a participant, but only participants can pick. The home page lists every session a user hosts or takes part in, so the host can always get back to one to start or watch it.
+
 The creator currently:
 
 * Defines the participants.
@@ -30,17 +34,28 @@ The creator currently:
 
 The exact implementation of these features should be determined by inspecting the existing codebase rather than assumed from this document.
 
+### Editing a Session
+
+Until the host starts the draft, they can change any of it from the session's edit page:
+
+* the settings: name, description, turn timer and scheduled start,
+* the items: add, rename, replace or remove photos, remove,
+* the participants: invite more people, remove people, and
+* the selection order.
+
+The number of participants and items entered when the session was created is only a starting point. The real counts are what is shown.
+
+Once the host starts the draft, all of this is fixed. That is enforced on the server when each change is saved, so an edit and the host pressing Start can never both take effect.
+
+Edits are announced live. Anyone already on the picking page has their page reloaded so they see the current items and players. A participant who is removed is not told; they simply lose access to the session.
+
 ## Participants
 
-Currently, participants can only be users who already have accounts on the platform.
+Participants are invited by **email address**. The owner shares an invitation link with each participant.
 
-Participants are presently added using their **username**.
+People who do not have an account can register first and then join with the link. An invitation only works for an account with the invited email address, and an email can be invited once per draft.
 
-This is a limitation that is intended to change.
-
-The desired direction is to allow participants to be added using their **email address**, which would allow people who do not already have platform accounts to participate/join a draft.
-
-This requirement should be considered when modifying participant-related functionality.
+Users are identified by their **username**. The `users` table has no separate "name" field.
 
 ## Selection Order
 
@@ -64,7 +79,10 @@ The selection mechanism is a core part of the system and should remain independe
 The current draft configuration includes at least:
 
 * Number of participants
-* Selection timer
+* Start date and time
+* Selection timer (seconds per turn)
+
+The start time is entered in the creator's local time and stored in UTC.
 
 Additional rules may be introduced as the product evolves.
 
@@ -112,67 +130,51 @@ This document describes the product/domain context and intended direction. It is
 
 When implementation details are unclear, use the codebase as the source of truth for current behavior and this document as the source of product intent.
 
-## Picking Flow — Current Limitations
+## Picking Flow
 
-The current picking/selection flow has some important limitations that need to be addressed.
+This section describes how picking works today. As elsewhere in this document, the codebase is the source of truth for details.
 
-### Turn Enforcement
+### Starting the Draft
 
-Participants should only be able to make a selection when it is their assigned turn.
+Nothing can be selected until the **host** starts the draft. Only the host can do this, from the draft's details page.
 
-Currently, the picking flow does not adequately enforce this requirement.
+The host can start the draft **at any time**, as long as:
 
-The system should treat the participant's turn as a server-side rule, not merely something enforced by the frontend UI.
+* every participant has joined and has a place in the order, and
+* the draft has items to select.
 
-A participant should not be able to select an item by directly calling an endpoint or otherwise bypassing the UI when it is not their turn.
+The start time is a schedule, not a rule: the picking page shows a countdown to it so participants know when to show up, and then "waiting for the host". It never starts the draft and never stops the host from starting early. Time passing, or people looking at the page, never starts a draft either.
 
-When investigating or modifying this functionality, inspect the complete flow, including:
+Starting begins the first participant's turn and their clock.
 
-* How the current turn is determined.
-* Where turn validation occurs.
-* How a participant submits a selection.
-* Whether the backend independently verifies that the participant is allowed to select.
-* Whether race conditions could allow multiple participants to select simultaneously.
-* Whether a user can manipulate requests to select outside their turn.
+Drafts that already had selections when this rule was introduced count as started.
 
-The required behavior is:
+### Turns and the Timer
 
-> Only the participant whose turn is currently active can successfully make a selection.
+Only the participant whose turn is currently active can successfully make a selection. This is enforced on the server, not only in the UI.
 
-### Broadcasting / Real-Time Updates
+Each turn lasts as long as the draft's selection timer. When the timer expires the turn is **skipped**: the participant loses that turn (they are not removed from the draft), the next participant's clock starts, and everyone is told. Skipped turns do not use up items, so a draft only completes when every item has been selected.
 
-The current picking flow does not have a proper broadcasting or real-time update mechanism.
+* The server's clock decides when time is up. Clients show a countdown but cannot skip a turn early.
+* A selection that arrives after the deadline is refused.
+* There is no background worker. An expired turn is skipped when someone next asks; the picking page asks when its countdown reaches zero. At most one turn is skipped per check, and the next turn's clock starts when the skip is recorded, so a long absence produces one skipped turn rather than a pile of them.
+* Turn order is round-robin and does not reverse.
 
-When one participant makes a selection, other participants may not immediately receive an updated draft state.
+### Real-Time Updates
 
-The picking experience should eventually support real-time state updates so participants can see important changes such as:
+Every change (the draft starting, a selection, a skipped turn) is broadcast to the draft's participants on a private channel using Laravel Reverb, so the picking page updates without a refresh. The payload is the full draft state, and clients ignore any state older than the one they already hold.
 
-* Whose turn it is.
-* When a selection is made.
-* Which item was selected.
-* Which items are no longer available.
-* When the next participant's turn begins.
-* Relevant timer/state changes.
-
-The implementation approach should be investigated based on the existing application architecture rather than assumed in advance.
+If Reverb is not configured, or the connection drops, the page falls back to polling the draft state endpoint. That endpoint is also how clients recover after a reconnect.
 
 ### Security
 
-The picking flow requires a security review.
+The backend independently enforces draft membership, participant identity (always the logged-in user, never a value sent by the client), the current turn, the deadline, item availability, and whether the host has started the draft. Only the host can start it, only participants can pick, and only the host and participants can read the draft state or listen to its channel.
 
-The fact that an item appears unavailable or that it is not a participant's turn in the frontend must not be considered sufficient protection.
+Concurrent requests are serialised on the draft, and a unique constraint stops the same item being claimed twice.
 
-The backend must independently enforce the rules governing:
+### Open Questions
 
-* Draft membership.
-* Participant identity.
-* Current selection turn.
-* Item availability.
-* Whether a selection is still valid.
-* Whether the participant is allowed to perform the action.
-
-The application should also account for concurrent requests and race conditions around selection.
-
-For example, two requests attempting to claim the same item at approximately the same time should not result in both participants successfully claiming it.
-
-Codex should investigate the existing implementation and identify the actual enforcement points, rather than assuming that the current UI behavior represents the application's security model.
+* Drafts created before owners were recorded have no host, so nobody can start them (unless they already had selections).
+* A draft where nobody ever picks never completes: skipped turns keep rotating for as long as someone is watching.
+* What should happen to a participant who is skipped repeatedly (auto-pick, removal) is undecided.
+* Only round-robin order is supported; there is no snake (reversing) order.

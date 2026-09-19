@@ -4,19 +4,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Item Selection</title>
     <link rel="stylesheet" href="{{ asset('/assets/style.css') }}">
+    @vite(['resources/js/app.js'])
 </head>
 
 <body>
 
     <div id="current-player" class="current-player">
-        <h2>Waiting for <span id="player-name">Player 1</span> to select an item...</h2>
+        <h2 id="turn-message"></h2>
+        @unless ($isParticipant)
+            <p class="pick-status">You are watching as the host. Only participants can pick.</p>
+        @endunless
+        <p id="turn-timer" class="pick-status"></p>
+        <p id="last-pick" class="pick-status"></p>
+        <p id="pick-status" class="pick-status" role="status" aria-live="polite"></p>
     </div>
 
     <div class="container item-grid">
         @foreach ($interests as $interest)
-            <div class="box item-card select-interest {{ in_array($interest->id, $selectedInterestIds) ? 'blurred' : '' }}" id="interest-{{ $interest->id }}" data-id="{{ $interest->id }}"
+            <div class="box item-card select-interest {{ in_array($interest->id, $state['selected_interest_ids']) ? 'blurred' : '' }}" id="interest-{{ $interest->id }}" data-id="{{ $interest->id }}"
                 data-interest="{{ $interest->name }}">
                 @if ($interest->image_path)
                     <img src="{{ asset('storage/' . $interest->image_path) }}" alt="{{ $interest->name }}">
@@ -29,11 +37,10 @@
     <div class="player-list">
         <h2>Player Order</h2>
         <ul id="player-list">
-            @foreach ($players as $player)
-                <li id="player-{{ $player['selection_no'] }}" class="{{ $loop->first ? 'current-turn' : '' }}"
+            @foreach ($state['players'] as $player)
+                <li id="player-{{ $player['selection_no'] }}"
+                    class="{{ $player['id'] === ($state['current_player']['id'] ?? null) ? 'current-turn' : '' }}"
                     data-player-id="{{ $player['id'] }}" data-selection-no="{{ $player['selection_no'] }}">
-
-                    <!-- Only display the following on the screen -->
                     <strong>{{ $player['selection_no'] }}.</strong>
                     {{ $player['username'] }}
                     <span class="current-pick-indicator">Currently Picking</span>
@@ -43,92 +50,209 @@
     </div>
 
 
-    <!-- JavaScript for dynamic updates -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         $(document).ready(function() {
-            let players = @json($players); // Assuming you passed the players from the server-side
+            const draftId = @json($draft->id);
+            const myId = @json(auth()->id());
+            const isParticipant = @json($isParticipant);
+            const stateUrl = @json(route('draft.state', ['draft_id' => $draft->id]));
+            const pickUrl = @json(route('select.interest', ['draft_id' => $draft->id]));
+            const csrfToken = @json(csrf_token());
 
-            let currentSelectionNo = 1; // Initialize with the first player’s selection_no
-            let totalPlayers = {{ $totalPlayers }}; // Total number of players
-            const serverCurrentPlayer = players.find(player => player.id === @json($currentPlayerId));
-            if (serverCurrentPlayer) {
-                currentSelectionNo = serverCurrentPlayer.selection_no;
+            // The server decides whose turn it is, when time runs out and which items are
+            // taken. This page only shows that state, so every update, whether from our own
+            // pick, a live event or a poll, goes through applyState().
+            let state = @json($state);
+            const layout = state.layout; // what this page was built from: the items and the players
+            let pending = false;
+            let clockOffset = 0; // server clock minus this browser's clock, in ms
+            let lastClockCheck = 0;
+
+            function syncClock() {
+                clockOffset = Date.parse(state.server_time) - Date.now();
             }
 
-            // Update the player display on page load
-            updateCurrentPlayerDisplay(currentSelectionNo);
+            function serverNow() {
+                return Date.now() + clockOffset;
+            }
 
-            // Handle card (interest) selection
-            $('.select-interest').on('click', function() {
-                let interestId = $(this).data('id');
+            function isMyTurn() {
+                return state.status === 'in_progress' && state.current_player !== null && state.current_player.id === myId;
+            }
 
-                // Check if it's the current player's turn
-                if (currentSelectionNo == getCurrentSelectionNo()) {
-                    // Get the actual player_id corresponding to the currentSelectionNo
-                    let currentPlayer = players.find(player => player.selection_no == currentSelectionNo);
-                    if (!currentPlayer) {
-                        alert("Error: Could not find the current player.");
-                        return;
-                    }
+            function setStatus(message) {
+                $('#pick-status').text(message);
+            }
 
-                    // Send the AJAX request with the correct player_id from the database
-                    $.ajax({
-                        url: "{{ route('select.interest', ['draft_id' => $draft->id]) }}",
-                        method: "POST",
-                        data: {
-                            interest_id: interestId,
-                            player_id: currentPlayer.id, // Use the player_id from the DB
-                            _token: "{{ csrf_token() }}"
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                // Update the board visually (blur the picked card)
-                                $(`#interest-${interestId}`).addClass('blurred');
+            function formatRemaining(ms) {
+                const total = Math.max(0, Math.ceil(ms / 1000));
+                const hours = Math.floor(total / 3600);
+                const minutes = Math.floor((total % 3600) / 60);
+                const seconds = String(total % 60).padStart(2, '0');
+                return hours > 0 ? hours + ':' + String(minutes).padStart(2, '0') + ':' + seconds : minutes + ':' + seconds;
+            }
 
-                                currentSelectionNo = response.next_player.selection_no;
-                                updateCurrentPlayerDisplay(currentSelectionNo);
-                            } else {
-                                alert("Error: " + response.message);
-                            }
-                        }
-                    });
+            function render() {
+                if (state.status === 'complete') {
+                    $('#turn-message').text('All items have been selected.');
+                } else if (state.status === 'scheduled') {
+                    $('#turn-message').text('Scheduled for ' + new Date(state.starts_at).toLocaleString() + '. Waiting for the host to start the draft.');
+                } else if (state.status === 'waiting') {
+                    $('#turn-message').text('Waiting for the host to start the draft.');
+                } else if (isMyTurn()) {
+                    $('#turn-message').text("It's your turn. Pick an item.");
                 } else {
-                    alert("Wait for your turn.");
+                    $('#turn-message').text('Waiting for ' + state.current_player.username + ' to select an item...');
                 }
+
+                if (state.last_skip) {
+                    $('#last-pick').text(state.last_skip.player_username + ' ran out of time and was skipped.');
+                } else if (state.last_pick) {
+                    $('#last-pick').text(state.last_pick.player_username + ' picked ' + state.last_pick.interest_name + '.');
+                } else {
+                    $('#last-pick').text('');
+                }
+
+                $('#player-list li').each(function() {
+                    const isCurrent = state.current_player !== null && $(this).data('player-id') === state.current_player.id;
+                    $(this).toggleClass('current-turn', isCurrent);
+                });
+
+                const taken = new Set(state.selected_interest_ids);
+                $('.select-interest').each(function() {
+                    $(this).toggleClass('blurred', taken.has($(this).data('id')));
+                });
+
+                tick();
+            }
+
+            // Counts down against the server's clock. The server alone decides that time is
+            // up, so at zero we only ask it to look (throttled) and show whatever it says.
+            function tick() {
+                let target = null;
+                let label = '';
+                if (state.status === 'in_progress') {
+                    target = Date.parse(state.turn_ends_at);
+                    label = 'Time left: ';
+                } else if (state.status === 'scheduled') {
+                    target = Date.parse(state.starts_at);
+                    label = 'Scheduled start in: ';
+                }
+
+                if (target === null) {
+                    $('#turn-timer').text('');
+                    return;
+                }
+
+                const remaining = target - serverNow();
+                if (remaining > 0) {
+                    $('#turn-timer').text(label + formatRemaining(remaining));
+                    return;
+                }
+
+                // At zero a scheduled draft becomes 'waiting' for the host, which the resync below shows.
+                $('#turn-timer').text(state.status === 'scheduled' ? '' : "Time's up");
+                if (Date.now() - lastClockCheck >= 1000) {
+                    lastClockCheck = Date.now();
+                    resync();
+                }
+            }
+
+            function applyState(next) {
+                // Events can arrive out of order; never go back to an older state.
+                if (!next || next.version < state.version) {
+                    return;
+                }
+                // The host edited the items or the players: rebuild this page from the server.
+                if (next.layout !== layout) {
+                    window.location.reload();
+                    return;
+                }
+                state = next;
+                syncClock();
+                render();
+            }
+
+            function resync() {
+                return $.getJSON(stateUrl).done(applyState);
+            }
+
+            $('.select-interest').on('click', function() {
+                if (pending) {
+                    return;
+                }
+                if (state.status === 'complete') {
+                    return;
+                }
+                if (!isParticipant) {
+                    setStatus("You're watching as the host. Only participants can pick.");
+                    return;
+                }
+                if (state.status === 'scheduled' || state.status === 'waiting') {
+                    setStatus("The host hasn't started the draft yet.");
+                    return;
+                }
+                if (!isMyTurn()) {
+                    setStatus('Wait for your turn.');
+                    return;
+                }
+
+                pending = true;
+                setStatus('');
+                $.ajax({
+                        url: pickUrl,
+                        method: 'POST',
+                        data: {
+                            interest_id: $(this).data('id'),
+                            _token: csrfToken
+                        }
+                    })
+                    .done(function(response) {
+                        applyState(response.state);
+                    })
+                    .fail(function(xhr) {
+                        setStatus((xhr.responseJSON && xhr.responseJSON.message) || 'That selection could not be made.');
+                        // Our view was out of date (someone picked first, or the turn moved on).
+                        resync();
+                    })
+                    .always(function() {
+                        pending = false;
+                    });
             });
 
-            // Function to get the current player's selection number
-            function getCurrentSelectionNo() {
-                return currentSelectionNo;
-            }
+            syncClock();
+            render();
+            setInterval(tick, 250);
 
-            // Update the player's turn (cycle through players)
-            function updatePlayerTurn() {
-                currentSelectionNo++;
-                if (currentSelectionNo > totalPlayers) {
-                    currentSelectionNo = 1;
+            // Live updates only count once this page is connected AND subscribed to the draft's
+            // channel. Without Reverb, with Reverb down, or with the channel refused, we poll.
+            function liveUpdatesWorking() {
+                if (!window.Echo) {
+                    return false;
                 }
-                $('#player-list li').removeClass('current-turn');
-                $('.current-pick-indicator').hide();
-
-                // Get the current player's list item by selection number
-                let currentPlayerItem = $(`#player-${currentSelectionNo}`);
-
-                // Add 'current-turn' class and show the indicator for the current player
-                currentPlayerItem.addClass('current-turn');
-                currentPlayerItem.find('.current-pick-indicator').show();
-
-                updateCurrentPlayerDisplay(currentSelectionNo);
+                const pusher = window.Echo.connector.pusher;
+                const channel = pusher.channel('private-draft.' + draftId);
+                return pusher.connection.state === 'connected' && !!channel && channel.subscribed;
             }
 
-            // Function to update the player name in the UI
-            function updateCurrentPlayerDisplay(currentSelectionNo) {
-                let currentPlayer = players.find(player => player.selection_no == currentSelectionNo);
-                if (currentPlayer) {
-                    $('#player-name').text(currentPlayer.username); // Update the displayed player's name
+            if (window.Echo) {
+                window.Echo.private('draft.' + draftId).listen('.state.changed', applyState);
+                // Changes made while the connection was down are only recovered by asking.
+                window.Echo.connector.pusher.connection.bind('connected', resync);
+            }
+
+            setInterval(function() {
+                if (!document.hidden && !liveUpdatesWorking()) {
+                    resync();
                 }
-            }
+            }, 3000);
+
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) {
+                    resync();
+                }
+            });
         });
     </script>
 

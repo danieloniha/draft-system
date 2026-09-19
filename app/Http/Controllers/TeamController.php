@@ -4,38 +4,51 @@ namespace App\Http\Controllers;
 
 use App\Models\Draft;
 use App\Models\Team;
+use App\Services\DraftEditor;
+use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class TeamController extends Controller
 {
 
     public function showInviteForm($draft_id, $no_of_teams)
     {
+        $this->authorize('configure', Draft::findOrFail($draft_id));
+
         // Pass the draft ID and number of interests to the view
         return view('send_invitations', compact('draft_id', 'no_of_teams'));
     }
 
-    public function inviteTeams(Request $request, $draft_id)
+    public function inviteTeams(Request $request, $draft_id, DraftEditor $editor)
     {
+        $draft = Draft::findOrFail($draft_id);
+        $this->authorize('configure', $draft);
+
+        // One seat per email: a duplicate would let one person join twice and hold two turns.
         $validated = $request->validate([
             'emails' => ['required', 'array', 'min:1'],
-            'emails.*' => ['required', 'email', 'distinct'],
+            'emails.*' => [
+                'required',
+                'email',
+                'distinct:ignore_case',
+                // joinDraft() matches emails case-insensitively, so this must too.
+                function (string $attribute, mixed $value, Closure $fail) use ($draft) {
+                    if ($draft->teams()->whereRaw('lower(email) = ?', [Str::lower($value)])->exists()) {
+                        $fail('This email has already been invited to this draft.');
+                    }
+                },
+            ],
+            'return_to' => ['nullable', Rule::in(['edit'])],
         ]);
 
-        $draft = Draft::findOrFail($draft_id);
+        $editor->addParticipants($draft, $validated['emails']);
 
-        // An invitation may be sent before the participant has an account.
-        foreach ($validated['emails'] as $email) {
-            $token = Str::random(32);
-
-            Team::create([
-                'user_id' => null,
-                'email' => $email,
-                'draft_id' => $draft->id,
-                'selection_no' => null,
-                'token' => $token,
-            ]);
+        // The edit page invites people one at a time and comes straight back to itself.
+        if (($validated['return_to'] ?? null) === 'edit') {
+            return redirect()->route('draft.edit', ['draft_id' => $draft->id])
+                ->with('status', 'Invitation created. Their link is on the invitation links page.');
         }
 
         return redirect()->route('invitations.sent', ['draft_id' => $draft_id]);
@@ -44,6 +57,8 @@ class TeamController extends Controller
     public function showInvitationsSent($draft_id)
     {
         $draft = Draft::findOrFail($draft_id);
+        $this->authorize('manage', $draft);
+
         $teams = $draft->teams()->orderBy('id')->get();
 
         return view('invitations_sent', compact('draft', 'teams'));
@@ -51,6 +66,8 @@ class TeamController extends Controller
 
     public function showSelectionForm($draft_id)
     {
+        $this->authorize('configure', Draft::findOrFail($draft_id));
+
         // Fetch all teams for the given draft
         $teams = Team::where('draft_id', $draft_id)->with('user')->get();
 
@@ -58,37 +75,32 @@ class TeamController extends Controller
         return view('selection_order', compact('teams', 'draft_id'));
     }
 
-    public function storeSelectionOrder(Request $request, $draft_id)
+    public function storeSelectionOrder(Request $request, $draft_id, DraftEditor $editor)
     {
+        $draft = Draft::findOrFail($draft_id);
+        $this->authorize('configure', $draft);
+
         // Validate the selection numbers
-        $request->validate([
+        $validated = $request->validate([
             'selection_numbers' => 'required|array|min:1',
             'selection_numbers.*' => 'required|integer|min:1',
+            'return_to' => ['nullable', Rule::in(['edit'])],
         ]);
 
-        // Extract all the selection numbers
-        $selectionNumbers = $request->input('selection_numbers');
+        // Unique numbers, and a place for every participant of this draft and nobody else
+        $editor->setOrder($draft, $validated['selection_numbers']);
 
-        // Ensure no duplicate selection numbers
-        if (count($selectionNumbers) !== count(array_unique($selectionNumbers))) {
-            return back()->withErrors(['Selection numbers must be unique.']);
+        if (($validated['return_to'] ?? null) === 'edit') {
+            return redirect()->route('draft.edit', ['draft_id' => $draft->id])->with('status', 'Selection order saved.');
         }
 
-        // Loop through the selection numbers and update each team
-        foreach ($selectionNumbers as $team_id => $selection_no) {
-            $team = Team::findOrFail($team_id);
-
-            // Update the team with the assigned selection number
-            $team->update([
-                'selection_no' => $selection_no,
-            ]);
-        }
-        return redirect()->route('draft.created', ['draft_id' => $draft_id]);
+        return redirect()->route('draft.created', ['draft_id' => $draft->id]);
     }
 
     public function showDraftCreated($draft_id)
     {
         $draft = Draft::findOrFail($draft_id);
+        $this->authorize('manage', $draft);
 
         return view('draft_created', compact('draft'));
     }

@@ -12,6 +12,7 @@ Database migrations, factories, and seeders belong under `database/`. Blade view
 - `npm install` installs frontend dependencies.
 - `php artisan serve` starts the Laravel development server.
 - `npm run dev` runs Vite with hot reload; `npm run build` creates production assets.
+- `php artisan reverb:start` runs the WebSocket server that pushes live draft updates. Run it alongside `php artisan serve` and `npm run dev`. Without it the picking page still works by polling.
 - `php artisan test` runs the PHPUnit test suite. Use `php artisan test --filter TestName` while iterating.
 - `php artisan migrate` applies local database migrations. Copy `.env.example` to `.env` and configure local credentials before running it.
 
@@ -32,3 +33,7 @@ Use short, imperative commit subjects, such as `Add draft selection validation` 
 ## Security & Configuration
 
 Never commit `.env`, application keys, credentials, or tokens. Add new settings to `.env.example` with safe placeholders and document any required migration or deployment step in the pull request.
+
+Reverb needs `REVERB_APP_ID`, `REVERB_APP_KEY` and `REVERB_APP_SECRET`; `php artisan reverb:install` generates them into your local `.env`. In production, restrict `allowed_origins` in `config/reverb.php` (it is `*` by default) and serve Reverb over TLS.
+
+Automated tests run against in-memory SQLite (see `phpunit.xml`). Never point scripts that write data at the database in `.env`.

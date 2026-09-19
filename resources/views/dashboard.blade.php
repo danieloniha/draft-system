@@ -23,5 +23,47 @@
             <a href="{{ route('join.draft.form') }}">Join a session</a>
         </div>
     </div>
+
+    <div class="container team-selection-container">
+        <h3>Your sessions</h3>
+
+        @if ($drafts->isEmpty())
+            <p class="pick-status">You are not part of any session yet. Create one, or join with an invitation link.</p>
+        @else
+            <table>
+                <thead>
+                    <tr>
+                        <th>Session</th>
+                        <th>Your role</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($drafts as $draft)
+                        @php
+                            $isHost = $draft->user_id === auth()->id();
+                            $isParticipant = $draft->teams->isNotEmpty();
+                            $isComplete = $draft->interests_count > 0 && $draft->selections_count >= $draft->interests_count;
+                        @endphp
+                        <tr>
+                            <td>{{ $draft->name }}</td>
+                            <td>{{ $isHost && $isParticipant ? 'Host and participant' : ($isHost ? 'Host' : 'Participant') }}</td>
+                            <td>{{ $isComplete ? 'Complete' : ($draft->turn_started_at ? 'In progress' : 'Not started') }}</td>
+                            <td>
+                                <a href="{{ route('draft.details', ['draft_id' => $draft->id]) }}">Details</a>
+                                &middot;
+                                @if ($isHost && ! $draft->turn_started_at && $draft->selections_count === 0)
+                                    <a href="{{ route('draft.edit', ['draft_id' => $draft->id]) }}">Edit</a>
+                                    &middot;
+                                @endif
+                                <a href="{{ route('show.interests', ['draft_id' => $draft->id]) }}">{{ $isParticipant ? 'Picking page' : 'Watch' }}</a>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
+    </div>
 </body>
 </html>

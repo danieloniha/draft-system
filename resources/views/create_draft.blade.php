@@ -39,8 +39,9 @@
             </div>
 
             <div class="form-group">
-                <label for="start-date">Start Date & Time</label>
+                <label for="start-date">Start Date & Time (your local time)</label>
                 <input type="datetime-local" id="start_date" name="start_date" required>
+                <input type="hidden" id="timezone" name="timezone">
             </div>
 
             <div class="form-group">
@@ -50,6 +51,11 @@
 
     </form>
 </div>
+
+<script>
+    // Sent with the form so the start time is read in the creator's own timezone.
+    document.getElementById('timezone').value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+</script>
 
 </body>
 </html>
