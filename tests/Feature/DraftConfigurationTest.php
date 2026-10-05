@@ -50,6 +50,10 @@ class DraftConfigurationTest extends TestCase
             'no_teams' => 2,
             'timer' => 30,
             'start_date' => '2026-10-01 10:00:00',
+            'type' => 'giveaway',
+            'visibility' => 'private',
+            'order_mode' => 'host_decided',
+            'participant_limit' => 100,
         ])->assertRedirect();
 
         $this->assertSame($this->owner->id, Draft::where('name', 'Spring yard sale')->sole()->user_id);
@@ -234,6 +238,10 @@ class DraftConfigurationTest extends TestCase
             'timer' => 30,
             'start_date' => '2026-10-01T10:00',
             'timezone' => 'Africa/Lagos',
+            'type' => 'giveaway',
+            'visibility' => 'private',
+            'order_mode' => 'host_decided',
+            'participant_limit' => 100,
         ])->assertRedirect();
 
         // 10:00 in Lagos (UTC+1) is 09:00 UTC, which is how it is stored.
@@ -249,6 +257,10 @@ class DraftConfigurationTest extends TestCase
             'no_teams' => 2,
             'timer' => 30,
             'start_date' => '2026-10-01T10:00',
+            'type' => 'giveaway',
+            'visibility' => 'private',
+            'order_mode' => 'host_decided',
+            'participant_limit' => 100,
         ])->assertRedirect();
 
         $this->assertSame('2026-10-01 10:00:00', Draft::where('name', 'No zone draft')->sole()->start_date->format('Y-m-d H:i:s'));
@@ -262,6 +274,10 @@ class DraftConfigurationTest extends TestCase
             'no_interests' => 3,
             'no_teams' => 2,
             'timer' => 30,
+            'type' => 'giveaway',
+            'visibility' => 'private',
+            'order_mode' => 'host_decided',
+            'participant_limit' => 100,
         ];
 
         $this->actingAs($this->owner)

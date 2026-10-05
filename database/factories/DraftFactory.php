@@ -20,6 +20,11 @@ class DraftFactory extends Factory
             'no_of_teams' => 2,
             'selection_time_limit' => 60,
             'start_date' => now(),
+            'type' => 'giveaway',
+            'giveaway_mode' => 'items',
+            'visibility' => 'private',
+            'order_mode' => 'host_decided',
+            'participant_limit' => 100,
         ];
     }
 }

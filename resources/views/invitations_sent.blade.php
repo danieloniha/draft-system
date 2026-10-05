@@ -9,7 +9,7 @@
 <body>
     <div class="draft-details-container">
         <h1 class="form-title">Invitation links are ready</h1>
-        <p>Share the matching link with each participant. They can register first if they do not have an account, using the email address you invited.</p>
+        <p>Share the matching link with each participant. They'll need an account using the email address you invited &mdash; if they don't have one yet, they can sign up when they open the link.</p>
 
         <div class="team-selection-container">
             <table>
@@ -32,7 +32,14 @@
         </div>
 
         <div class="form-group" style="margin-top: 28px">
-            <a class="btn" href="{{ route('show.selection.order', ['draft_id' => $draft->id]) }}">Set selection order</a>
+            {{-- fcfs/random assign the order automatically, so there is nothing to set here. --}}
+            @if ($draft->type === 'giveaway' && $draft->order_mode === 'host_decided')
+                <a class="btn" href="{{ route('show.selection.order', ['draft_id' => $draft->id]) }}">Set selection order</a>
+            @elseif ($draft->type === 'bidding' && $draft->order_mode === 'host_decided')
+                <a class="btn" href="{{ route('draft.edit', ['draft_id' => $draft->id]) }}">Set item order</a>
+            @else
+                <a class="btn" href="{{ route('draft.created', ['draft_id' => $draft->id]) }}">Finish</a>
+            @endif
         </div>
     </div>
 

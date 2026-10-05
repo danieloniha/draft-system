@@ -9,13 +9,19 @@
 </head>
 <body>
     <div class="form-container">
-        <h2 class="form-title">Join Draft</h2>
+        <h2 class="form-title">{{ $draftName ? 'Join '.$draftName : 'Join Draft' }}</h2>
+        @if ($draftName)
+            <p>You've been invited to this session.</p>
+        @endif
 
         <form method="POST" action="{{ route('join.draft') }}">
             @csrf
             <div class="form-group">
                 <label for="token">Enter Token</label>
                 <input type="text" id="token" name="token" value="{{ old('token', $token) }}" placeholder="Enter your invitation token" required>
+                @error('token')
+                    <p>{{ $message }}</p>
+                @enderror
             </div>
 
             <div class="form-group">

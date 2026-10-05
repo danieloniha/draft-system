@@ -9,15 +9,25 @@ use App\Models\Selection;
 use App\Models\Team;
 use App\Models\TurnSkip;
 use App\Models\User;
+use App\Services\Contracts\DraftFlowService;
+use App\Services\Support\DraftClock;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Throwable;
 
-class DraftPickService
+/**
+ * Giveaway drafts: participants take turns claiming items. Order is either set
+ * by the host, assigned as people join (first come, first served), or shuffled
+ * once at start (random) — see DraftPolicy/DraftEditor for who may set which.
+ */
+class DraftPickService implements DraftFlowService
 {
+    public function __construct(private DraftClock $clock)
+    {
+    }
+
     /**
      * The state every participant sees: who is in the order, whose turn it is,
      * how long they have and which items are gone.
@@ -30,7 +40,7 @@ class DraftPickService
     {
         $draft = Draft::findOrFail($draft->id);
         $teams = $this->teams($draft);
-        $this->assertReady($teams);
+        $this->assertReady($teams, $draft);
 
         $selections = Selection::where('draft_id', $draft->id)->orderBy('id')->get();
         $skips = TurnSkip::where('draft_id', $draft->id)->orderBy('turn_number')->get();
@@ -67,12 +77,15 @@ class DraftPickService
             'turn_number' => $turnNumber,
             'time_limit' => (int) $draft->selection_time_limit,
             'starts_at' => $draft->start_date->toIso8601String(),
-            'turn_ends_at' => $status === 'in_progress' ? $this->deadline($draft)->toIso8601String() : null,
+            'turn_ends_at' => $status === 'in_progress' ? $this->clock->deadline($draft)->toIso8601String() : null,
             'server_time' => now()->toIso8601String(),
             'current_player' => $currentTeam ? $playersByTeam[$currentTeam->id] : null,
             'players' => $playersByTeam->values()->all(),
             'layout' => $this->layout($draft, $teams),
             'selected_interest_ids' => $selections->pluck('interest_id')->map(fn ($id) => (int) $id)->all(),
+            // Who ended up with what. Only once the draft is over: until then it is the live
+            // board that matters, and this would just be sent again with every pick.
+            'results' => $isComplete ? $this->results($teams, $selections) : [],
             'last_pick' => $lastPick ? [
                 'interest_id' => (int) $lastPick->interest_id,
                 'interest_name' => $lastPick->selected,
@@ -111,9 +124,10 @@ class DraftPickService
      *
      * Who may do this is decided by DraftPolicy::start (the host). Here the draft
      * has to be ready: items to pick, and every participant joined and in the
-     * order. The host may start it at any time; the scheduled start time is only
-     * a schedule. Starting a draft that has already started does nothing, so a
-     * double click is harmless.
+     * order. Under order_mode 'random' the order is shuffled here, once, right
+     * before starting. The host may start it at any time; the scheduled start
+     * time is only a schedule. Starting a draft that has already started does
+     * nothing, so a double click is harmless.
      */
     public function start(Draft $draft): void
     {
@@ -125,7 +139,12 @@ class DraftPickService
             }
 
             abort_if($draft->interests()->doesntExist(), 422, 'This draft has no items to select.');
-            $this->assertReady($this->teams($draft));
+
+            $teams = $this->teams($draft);
+            if ($draft->order_mode === 'random') {
+                $this->assignRandomOrder($teams);
+            }
+            $this->assertReady($teams, $draft);
 
             $draft->update(['turn_started_at' => now()]);
 
@@ -149,7 +168,7 @@ class DraftPickService
      */
     public function advanceClock(Draft $draft): ?Team
     {
-        if (! $this->turnHasExpired($draft) || $this->isComplete($draft)) {
+        if (! $this->clock->hasExpired($draft) || $this->isComplete($draft)) {
             return null;
         }
 
@@ -160,12 +179,12 @@ class DraftPickService
             $draft = Draft::whereKey($draft->id)->lockForUpdate()->firstOrFail();
 
             // Someone else may have got here between the check above and the lock.
-            if (! $this->turnHasExpired($draft) || $this->isComplete($draft)) {
+            if (! $this->clock->hasExpired($draft) || $this->isComplete($draft)) {
                 return false;
             }
 
             $teams = $this->teams($draft);
-            $this->assertReady($teams);
+            $this->assertReady($teams, $draft);
 
             $turnNumber = $this->turnNumber($draft);
             $team = $teams[$turnNumber % $teams->count()];
@@ -219,12 +238,12 @@ class DraftPickService
 
             $teams = $this->teams($draft);
             abort_unless($teams->contains('user_id', $user->id), 403, 'You are not a participant in this draft.');
-            $this->assertReady($teams);
+            $this->assertReady($teams, $draft);
             abort_if($draft->turn_started_at === null, 409, 'The host has not started this draft yet.');
 
             $currentTeam = $teams[$this->turnNumber($draft) % $teams->count()];
             abort_unless((int) $currentTeam->user_id === (int) $user->id, 403, 'It is not your turn to make a selection.');
-            abort_if($this->deadline($draft)->lte(now()), 409, 'Your time ran out. Refresh to see whose turn it is.');
+            abort_if($this->clock->deadline($draft)->lte(now()), 409, 'Your time ran out. Refresh to see whose turn it is.');
 
             $interest = Interest::where('draft_id', $draft->id)->whereKey($interestId)->first();
             abort_unless($interest, 404, 'That item is not part of this draft.');
@@ -265,7 +284,15 @@ class DraftPickService
         return $draft->teams()->with('user')->orderBy('selection_no')->orderBy('id')->get()->values();
     }
 
-    private function assertReady(Collection $teams): void
+    /**
+     * @param  Draft  $draft  Only used to check order_mode: under 'fcfs' every joined team
+     *                        already has a selection_no by construction (assigned at join
+     *                        time — see DraftJoinService), and under 'random' none of them do
+     *                        yet pre-start (assigned in start(), just before this runs there
+     *                        too) — so the "must already have an order" rule only makes sense,
+     *                        and is only enforced, for 'host_decided'.
+     */
+    private function assertReady(Collection $teams, Draft $draft): void
     {
         abort_if($teams->isEmpty(), 422, 'This draft has no participants.');
         abort_if(
@@ -273,10 +300,23 @@ class DraftPickService
             422,
             'Every invited participant must join before picking starts.'
         );
-        abort_if(
-            $teams->contains(fn ($team) => is_null($team->selection_no)),
-            422,
-            'Every participant must have a selection order before picking starts.'
+        if ($draft->order_mode === 'host_decided') {
+            abort_if(
+                $teams->contains(fn ($team) => is_null($team->selection_no)),
+                422,
+                'Every participant must have a selection order before picking starts.'
+            );
+        }
+    }
+
+    /**
+     * order_mode 'random': give every team a fresh, shuffled place in the order.
+     * Called only from start(), under its lock, right before the draft begins.
+     */
+    private function assignRandomOrder(Collection $teams): void
+    {
+        $teams->shuffle()->values()->each(
+            fn (Team $team, int $index) => $team->update(['selection_no' => $index + 1])
         );
     }
 
@@ -294,6 +334,26 @@ class DraftPickService
     }
 
     /**
+     * What every participant ended up with, in selection order, each one's items in the order
+     * they took them. A participant who never got an item (more players than items) is still
+     * listed, with none.
+     *
+     * @param  Collection<int, Selection>  $selections  every pick, oldest first
+     * @return list<array{player_id: int, player_username: string, selection_no: int, items: list<string>}>
+     */
+    private function results(Collection $teams, Collection $selections): array
+    {
+        $picksByTeam = $selections->groupBy('team_id');
+
+        return $teams->map(fn ($team) => [
+            'player_id' => (int) $team->user_id,
+            'player_username' => $team->user->username,
+            'selection_no' => (int) $team->selection_no,
+            'items' => ($picksByTeam[$team->id] ?? collect())->pluck('selected')->values()->all(),
+        ])->values()->all();
+    }
+
+    /**
      * A fingerprint of what the picking page is built from: the items and the
      * players in order. A page that is sent a different one is out of date (the
      * host edited the draft) and reloads itself.
@@ -305,19 +365,6 @@ class DraftPickService
         $players = $teams->map(fn ($team) => [(int) $team->user_id, $team->user->username, (int) $team->selection_no]);
 
         return md5(json_encode([$items->all(), $players->all()]));
-    }
-
-    /**
-     * True when the draft is running and the current turn's time is up.
-     */
-    private function turnHasExpired(Draft $draft): bool
-    {
-        return $draft->turn_started_at !== null && $this->deadline($draft)->lte(now());
-    }
-
-    private function deadline(Draft $draft): Carbon
-    {
-        return $draft->turn_started_at->copy()->addSeconds((int) $draft->selection_time_limit);
     }
 
     /**

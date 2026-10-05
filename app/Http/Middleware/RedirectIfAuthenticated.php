@@ -20,7 +20,9 @@ class RedirectIfAuthenticated
         $guards = empty($guards) ? [null] : $guards;
 
         foreach ($guards as $guard) {
-            if (Auth::guard($guard)->check()) {
+            // A guest (someone playing from a link without an account) may still reach login and
+            // sign-up: this is how they get an account, so sending them away would strand them.
+            if (Auth::guard($guard)->check() && ! Auth::guard($guard)->user()->isGuest()) {
                 return redirect(RouteServiceProvider::HOME);
             }
         }

@@ -305,6 +305,71 @@ class DraftPickingTest extends TestCase
             ->assertSessionHasErrors(['start' => 'Every invited participant must join before picking starts.']);
     }
 
+    // ------------------------------------------------------------------ results, once every item is taken
+
+    public function test_results_are_only_sent_once_every_item_is_taken(): void
+    {
+        $this->pick($this->players[0], $this->interests[0])->assertJsonPath('state.results', []);
+        $this->pick($this->players[1], $this->interests[1])->assertJsonPath('state.results', []);
+        $this->pick($this->players[2], $this->interests[2])->assertJsonPath('state.results', []);
+        $this->assertSame([], $this->actingAs($this->players[0])->getJson(route('draft.state', $this->draft->id))->json('results'));
+    }
+
+    public function test_a_finished_draft_reports_what_every_player_ended_up_with(): void
+    {
+        // Round robin over 3 players and 4 items: the first player picks twice.
+        $this->pick($this->players[0], $this->interests[0])->assertOk();
+        $this->pick($this->players[1], $this->interests[1])->assertOk();
+        $this->pick($this->players[2], $this->interests[2])->assertOk();
+        $final = $this->pick($this->players[0], $this->interests[3])->assertOk();
+
+        $final->assertJsonPath('state.status', 'complete');
+
+        $results = $final->json('state.results');
+        $this->assertSame([1, 2, 3], array_column($results, 'selection_no'), 'in selection order');
+        $this->assertSame(
+            array_map(fn (User $player) => $player->id, $this->players->all()),
+            array_column($results, 'player_id')
+        );
+        $this->assertSame([$this->interests[0]->name, $this->interests[3]->name], $results[0]['items'], 'in the order they were taken');
+        $this->assertSame([$this->interests[1]->name], $results[1]['items']);
+        $this->assertSame([$this->interests[2]->name], $results[2]['items']);
+
+        // Everyone sees the same thing, including someone opening the page afterwards.
+        $this->assertSame(
+            $results,
+            $this->actingAs($this->players[2])->getJson(route('draft.state', $this->draft->id))->json('results')
+        );
+    }
+
+    public function test_a_player_who_never_got_an_item_is_still_listed(): void
+    {
+        [$draft, $players, $interests] = $this->buildDraft(3, 2, ['turn_started_at' => now()]);
+
+        $this->actingAs($players[0])->postJson(route('select.interest', $draft->id), ['interest_id' => $interests[0]->id])->assertOk();
+        $final = $this->actingAs($players[1])->postJson(route('select.interest', $draft->id), ['interest_id' => $interests[1]->id])->assertOk();
+
+        $results = $final->json('state.results');
+        $this->assertCount(3, $results);
+        $this->assertSame([], $results[2]['items']);
+        $this->assertSame($players[2]->id, $results[2]['player_id']);
+    }
+
+    public function test_the_finished_page_carries_the_results_for_everyone_to_see(): void
+    {
+        $this->withoutVite();
+        foreach ([0, 1, 2, 0] as $i => $player) {
+            $this->pick($this->players[$player], $this->interests[$i])->assertOk();
+        }
+
+        // The page is built from the same state: its results panel is there, and the state it
+        // starts from already holds every player's items.
+        $this->actingAs($this->players[1])->get(route('show.interests', $this->draft->id))
+            ->assertOk()
+            ->assertSee('id="results-panel"', false)
+            ->assertSee($this->interests[3]->name);
+    }
+
     public function test_only_the_host_and_participants_can_listen_to_the_draft_channel(): void
     {
         $authorize = $this->registeredChannelCallback('draft.{draftId}');

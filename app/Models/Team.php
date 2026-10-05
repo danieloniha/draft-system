@@ -15,6 +15,10 @@ class Team extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function draft() {
+        return $this->belongsTo(Draft::class);
+    }
+
     public function drafts() {
         return $this->belongsToMany(Draft::class);
     }

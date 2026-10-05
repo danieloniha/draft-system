@@ -26,20 +26,28 @@
         <div class="draft-info">
             <p><strong>Session:</strong> {{ $draft->name }}</p>
             <p><strong>Description:</strong> {{ $draft->title }}</p>
-            <p><strong>Participants:</strong> {{ $teams->count() }}</p>
-            <p><strong>Items:</strong> {{ $draft->interests()->count() }}</p>
+            <p><strong>Type:</strong> {{ $draft->type === 'bidding' ? 'Bidding' : ($draft->isMoneyMode() ? 'Giveaway (Money Split)' : 'Giveaway') }}</p>
+            <p><strong>Visibility:</strong> {{ $draft->isPublic() ? 'Public' : 'Private' }}</p>
+            <p><strong>Participants:</strong> {{ $teams->count() }} / {{ $draft->participant_limit }}</p>
+            @if ($draft->isMoneyMode())
+                <p><strong>Payout tiers:</strong> {{ $draft->payoutTiers()->count() }}</p>
+            @else
+                <p><strong>Items:</strong> {{ $draft->interests()->count() }}</p>
+            @endif
             <p><strong>Scheduled start:</strong> <time datetime="{{ $draft->start_date->toIso8601String() }}">{{ $draft->start_date->format('Y-m-d H:i') }} UTC</time></p>
-            <p><strong>Turn timer:</strong> {{ $draft->selection_time_limit }} seconds</p>
+            @unless ($draft->isMoneyMode())
+                <p><strong>Turn timer:</strong> {{ $draft->selection_time_limit }} seconds</p>
+            @endunless
         </div>
 
         <!-- Display teams and their selection numbers -->
         <div class="team-selection-container">
-            <h3>Participants and Selection Order</h3>
+            <h3>Participants and {{ $draft->isMoneyMode() ? 'Rank' : 'Selection' }} Order</h3>
             <table>
                 <thead>
                     <tr>
                         <th>Participant</th>
-                        <th>Selection Number</th>
+                        <th>{{ $draft->isMoneyMode() ? 'Rank' : 'Selection Number' }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -57,23 +65,29 @@
         <!-- Start the draft (host) / go to the picking page (participants) -->
         <div class="form-group">
             @if ($hasStarted)
-                <p>The draft has started.</p>
+                <p>{{ $draft->isMoneyMode() ? 'The results have been revealed.' : 'The draft has started.' }}</p>
             @elseif ($isHost)
-                <p>You are the host. Nobody can pick until you start the draft.</p>
+                <p>You are the host. {{ $draft->isMoneyMode() ? 'Nothing is revealed until you start the draft.' : 'Nobody can pick until you start the draft.' }}</p>
             @else
-                <p>Waiting for the host to start the draft.</p>
+                <p>{{ $draft->isMoneyMode() ? 'Waiting for the host to reveal the results.' : 'Waiting for the host to start the draft.' }}</p>
             @endif
 
             @if ($isHost && ! $hasStarted)
                 <form action="{{ route('start.draft', ['draft_id' => $draft->id]) }}" method="POST">
                     @csrf
-                    <button type="submit" class="btn start-btn">Start Draft</button>
+                    <button type="submit" class="btn start-btn">{{ $draft->isMoneyMode() ? 'Reveal Results' : 'Start Draft' }}</button>
                 </form>
                 <a class="btn start-btn" href="{{ route('draft.edit', ['draft_id' => $draft->id]) }}">Edit session</a>
             @endif
 
             @if ($isParticipant || $isHost)
-                <a class="btn start-btn" href="{{ route('show.interests', ['draft_id' => $draft->id]) }}">{{ $isParticipant ? 'Go to picking page' : 'Watch the draft' }}</a>
+                <a class="btn start-btn" href="{{ route('show.interests', ['draft_id' => $draft->id]) }}">
+                    @if ($draft->isMoneyMode())
+                        {{ $isParticipant ? 'Go to results page' : 'Watch the draft' }}
+                    @else
+                        {{ $isParticipant ? ('Go to ' . ($draft->type === 'bidding' ? 'bidding' : 'picking') . ' page') : 'Watch the draft' }}
+                    @endif
+                </a>
             @endif
         </div>
     </div>

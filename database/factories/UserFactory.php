@@ -35,6 +35,18 @@ class UserFactory extends Factory
     }
 
     /**
+     * Someone who joined from a link with just a name: no email, no password of their own.
+     */
+    public function guest(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'email' => null,
+            'email_verified_at' => null,
+            'is_guest' => true,
+        ]);
+    }
+
+    /**
      * Indicate that the model's email address should be unverified.
      */
     public function unverified(): static

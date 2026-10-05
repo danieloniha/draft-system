@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 class Draft extends Model
 {
@@ -37,14 +38,54 @@ class Draft extends Model
         return $this->hasMany(Team::class);
     }
 
+    public function bids() {
+        return $this->hasMany(Bid::class);
+    }
+
+    public function payoutTiers() {
+        return $this->hasMany(PayoutTier::class);
+    }
+
     /**
      * Until the host starts it a draft can be edited. After that its items,
-     * participants and order are fixed. A draft that already has selections
-     * counts as started, whatever its turn clock says.
+     * participants and order are fixed. A draft that already has selections or
+     * bids counts as started, whatever its turn clock says.
      */
     public function hasStarted(): bool
     {
-        return $this->turn_started_at !== null || $this->selections()->exists();
+        return $this->turn_started_at !== null || $this->selections()->exists() || $this->bids()->exists();
+    }
+
+    public function isBidding(): bool
+    {
+        return $this->type === 'bidding';
+    }
+
+    /**
+     * A Giveaway draft where the host defines who gets what money instead of
+     * participants claiming items. Starting it is a one-time reveal, not the
+     * beginning of a turn-based session.
+     */
+    public function isMoneyMode(): bool
+    {
+        return $this->type === 'giveaway' && $this->giveaway_mode === 'money';
+    }
+
+    public function isPublic(): bool
+    {
+        return $this->visibility === 'public';
+    }
+
+    /**
+     * A public draft needs one stable link. Generated once, the first time it
+     * becomes public, and kept after that so a link the host already shared
+     * never dies just because they edit something else later.
+     */
+    public function ensurePublicToken(): void
+    {
+        if ($this->isPublic() && $this->public_token === null) {
+            $this->update(['public_token' => Str::random(32)]);
+        }
     }
 
     /**

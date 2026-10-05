@@ -36,16 +36,29 @@ class RegisteredUserController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
-        $user = User::create([
+        $attributes = [
             'email' => $request->email,
             'username' => $request->username,
             'password' => Hash::make($request->password),
-        ]);
+            'is_guest' => false,
+        ];
+
+        $user = $request->user();
+
+        if ($user?->isGuest()) {
+            // Someone playing as a guest signing up keeps the seats they already hold: the same
+            // row simply becomes a full account, rather than a second user being created.
+            $user->update($attributes);
+        } else {
+            $user = User::create($attributes);
+        }
 
         event(new Registered($user));
 
         Auth::login($user);
 
-        return redirect(RouteServiceProvider::HOME);
+        // Carries on to where they were headed, like logging in does: someone who signed up from
+        // a private invitation link lands back on it rather than on the dashboard.
+        return redirect()->intended(RouteServiceProvider::HOME);
     }
 }

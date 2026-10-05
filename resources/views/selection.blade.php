@@ -22,7 +22,22 @@
         <p id="pick-status" class="pick-status" role="status" aria-live="polite"></p>
     </div>
 
-    <div class="container item-grid">
+    {{-- Once every item is taken this replaces the board and the order list below: who got what. --}}
+    <div class="results-panel" id="results-panel" style="display: none;">
+        <h2>Results</h2>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Order</th>
+                    <th>Player</th>
+                    <th>Got</th>
+                </tr>
+            </thead>
+            <tbody id="results-body"></tbody>
+        </table>
+    </div>
+
+    <div class="container item-grid" id="item-grid">
         @foreach ($interests as $interest)
             <div class="box item-card select-interest {{ in_array($interest->id, $state['selected_interest_ids']) ? 'blurred' : '' }}" id="interest-{{ $interest->id }}" data-id="{{ $interest->id }}"
                 data-interest="{{ $interest->name }}">
@@ -34,7 +49,7 @@
         @endforeach
     </div>
 
-    <div class="player-list">
+    <div class="player-list" id="player-order">
         <h2>Player Order</h2>
         <ul id="player-list">
             @foreach ($state['players'] as $player)
@@ -124,7 +139,40 @@
                     $(this).toggleClass('blurred', taken.has($(this).data('id')));
                 });
 
+                renderResults();
                 tick();
+            }
+
+            // Once every item is taken, the board and the order list have nothing left to say:
+            // show who got what instead. Built with .text() throughout, since names are user input.
+            function renderResults() {
+                const done = state.status === 'complete';
+                $('#item-grid, #player-order').toggle(!done);
+                $('#results-panel').toggle(done);
+                if (!done) {
+                    return;
+                }
+
+                const $body = $('#results-body').empty();
+                (state.results || []).forEach(function(row) {
+                    const $items = $('<td>');
+                    if (row.items.length === 0) {
+                        $items.text('Nothing');
+                    }
+                    row.items.forEach(function(name) {
+                        $('<span class="result-chip">').text(name).appendTo($items);
+                    });
+
+                    const $row = $('<tr>').append(
+                        $('<td>').text(row.selection_no),
+                        $('<td>').text(row.player_username + (row.player_id === myId ? ' (you)' : '')),
+                        $items
+                    );
+                    if (row.player_id === myId) {
+                        $row.find('td').addClass('own-rank');
+                    }
+                    $row.appendTo($body);
+                });
             }
 
             // Counts down against the server's clock. The server alone decides that time is

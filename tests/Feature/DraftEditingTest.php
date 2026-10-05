@@ -165,6 +165,10 @@ class DraftEditingTest extends TestCase
                 'timer' => 90,
                 'start_date' => '2026-10-05T18:30',
                 'timezone' => 'Africa/Lagos',
+                'type' => 'giveaway',
+                'visibility' => 'private',
+                'order_mode' => 'host_decided',
+                'participant_limit' => 100,
             ])
             ->assertRedirect($this->editUrl())
             ->assertSessionHas('status', 'Settings saved.');
@@ -177,13 +181,23 @@ class DraftEditingTest extends TestCase
         $this->assertSame('2026-10-05 17:30:00', $draft->start_date->format('Y-m-d H:i:s'));
     }
 
+    public function test_the_description_can_be_cleared(): void
+    {
+        $this->asHost()->patch(route('draft.update', $this->draft->id), [
+            'name' => 'Yard Sale', 'title' => '', 'timer' => 60, 'start_date' => '2026-10-05T18:30',
+            'type' => 'giveaway', 'visibility' => 'private', 'order_mode' => 'host_decided', 'participant_limit' => 100,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertNull($this->draft->fresh()->title);
+    }
+
     public function test_settings_are_validated(): void
     {
         $valid = ['name' => 'Ok', 'title' => 'Ok', 'timer' => 30, 'start_date' => '2026-10-05T18:30'];
 
         foreach ([
             ['name' => ''],
-            ['title' => ''],
+            ['title' => str_repeat('x', 256)],
             ['name' => str_repeat('x', 256)],
             ['timer' => 0],
             ['timer' => 'soon'],
@@ -226,6 +240,7 @@ class DraftEditingTest extends TestCase
 
         $this->asHost()->patch(route('draft.update', $this->draft->id), [
             'name' => 'Yard Sale', 'title' => 'x', 'timer' => 60, 'start_date' => '2026-09-19T08:00', 'timezone' => 'UTC',
+            'type' => 'giveaway', 'visibility' => 'private', 'order_mode' => 'host_decided', 'participant_limit' => 100,
         ]);
 
         $this->state($this->players[0])->assertJsonPath('status', 'waiting');
@@ -630,8 +645,13 @@ class DraftEditingTest extends TestCase
         $this->asHost()->get(route('dashboard'))->assertOk()->assertDontSee($this->editUrl());
     }
 
-    public function test_the_session_created_page_links_to_the_edit_page(): void
+    public function test_the_session_created_page_links_to_session_details(): void
     {
-        $this->asHost()->get(route('draft.created', $this->draft->id))->assertOk()->assertSee($this->editUrl());
+        // Not directly to the edit page: that's reachable from session details instead, so this
+        // page does not need its own link (and its own filled button) for it.
+        $this->asHost()->get(route('draft.created', $this->draft->id))
+            ->assertOk()
+            ->assertSee(route('draft.details', $this->draft->id))
+            ->assertDontSee($this->editUrl());
     }
 }
