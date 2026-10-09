@@ -19,7 +19,8 @@
 
         <div class="form-group">
             <label for="password">New password</label>
-            <input type="password" id="password" name="password" required autocomplete="new-password">
+            <input type="password" id="password" name="password" required minlength="6" autocomplete="new-password">
+            <p class="hint">Minimum 6 characters.</p>
             @error('password')
                 <p>{{ $message }}</p>
             @enderror
