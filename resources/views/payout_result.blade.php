@@ -7,7 +7,10 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Payout Results</title>
     <link rel="stylesheet" href="{{ asset('/assets/style.css') }}">
-    @vite(['resources/js/app.js'])
+    {{-- Live updates need the built assets; without them the page still works by polling. --}}
+    @if (file_exists(public_path('hot')) || file_exists(public_path('build/manifest.json')))
+        @vite(['resources/js/app.js'])
+    @endif
 </head>
 
 <body>
@@ -18,6 +21,24 @@
             <p class="pick-status">You are watching as the host.</p>
         @endunless
         <p id="reveal-timer" class="pick-status"></p>
+        <p id="my-number" class="pick-status"></p>
+
+        {{-- The host reveals from here too, not only from the details page. --}}
+        @can('start', $draft)
+            <div id="host-controls" class="form-group">
+                <form action="{{ route('start.draft', ['draft_id' => $draft->id]) }}" method="POST" style="display:inline">
+                    @csrf
+                    <button type="submit" class="btn start-btn">Reveal Results</button>
+                </form>
+                <a class="btn-outline" href="{{ route('draft.edit', ['draft_id' => $draft->id]) }}">Edit session</a>
+            </div>
+        @endcan
+    </div>
+
+    {{-- Random order only: a draw that plays out when the host reveals. --}}
+    <div id="reveal-stage" class="current-player" style="display:none;">
+        <p class="pick-status">Drawing the order&hellip;</p>
+        <h2 id="reveal-drum" style="font-size:2.2rem;min-height:3rem"></h2>
     </div>
 
     <div class="player-list">
@@ -66,7 +87,86 @@
                 return hours > 0 ? hours + ':' + String(minutes).padStart(2, '0') + ':' + seconds : minutes + ':' + seconds;
             }
 
+            // The random draw plays once per browser per draft, so a refresh shows the table straight away.
+            const seenKey = 'payout-reveal-seen-' + draftId;
+            let revealing = false;
+
+            function alreadySeen() {
+                try { return localStorage.getItem(seenKey) === '1'; } catch (e) { return true; }
+            }
+
+            function markSeen() {
+                try { localStorage.setItem(seenKey, '1'); } catch (e) {}
+            }
+
+            function rowHtml(row) {
+                const cls = row.player_id === myId ? ' class="own-rank"' : '';
+                return '<tr data-rank="' + row.rank + '">' +
+                    '<td' + cls + '>' + row.rank + '</td>' +
+                    '<td' + cls + '>' + $('<span>').text(row.player_username).html() + '</td>' +
+                    '<td' + cls + '>' + row.amount.toLocaleString() + '</td>' +
+                    '</tr>';
+            }
+
+            // Names spin in a drum, then the ranks are announced from last to first.
+            function playReveal() {
+                revealing = true;
+                markSeen();
+                const names = state.results.map(function(r) { return r.player_username; });
+                const rows = state.results.slice().reverse();
+                const $body = $('#results-body').empty();
+                $('#list-title').text('Results');
+                $('#player-list').hide();
+                $('#results-table').show();
+                $('#reveal-stage').show();
+
+                const spin = setInterval(function() {
+                    $('#reveal-drum').text(names[Math.floor(Math.random() * names.length)]);
+                }, 70);
+
+                setTimeout(function() {
+                    clearInterval(spin);
+                    $('#reveal-stage').hide();
+                    let i = 0;
+                    const next = setInterval(function() {
+                        if (i >= rows.length) {
+                            clearInterval(next);
+                            revealing = false;
+                            return;
+                        }
+                        // Newest (best) rank goes on top.
+                        $(rowHtml(rows[i])).hide().prependTo($body).fadeIn(400);
+                        i++;
+                    }, 700);
+                }, 3000);
+            }
+
             function render() {
+                if (revealing) {
+                    return;
+                }
+
+                const complete = state.status === 'complete';
+                $('#host-controls').toggle(!complete);
+                const me = state.players.find(function(p) { return p.id === myId; });
+                if (complete) {
+                    $('#my-number').text('');
+                } else if (state.order_mode === 'random') {
+                    $('#my-number').text('Your number is drawn at random when the host reveals the results.');
+                } else if (me && me.selection_no) {
+                    $('#my-number').text('Your number: ' + me.selection_no);
+                } else if (me) {
+                    $('#my-number').text('The host has not given you a number yet.');
+                } else {
+                    $('#my-number').text('');
+                }
+
+                if (complete && state.order_mode === 'random' && !alreadySeen()) {
+                    $('#status-message').text('Results are in!');
+                    playReveal();
+                    return;
+                }
+
                 if (state.status === 'complete') {
                     $('#status-message').text('Results are in!');
                 } else if (state.status === 'scheduled') {
@@ -93,7 +193,8 @@
                     $('#results-table').hide();
                     const $list = $('#player-list').empty().show();
                     state.players.forEach(function(player) {
-                        $('<li>').text(player.username).appendTo($list);
+                        $('<li>').text((player.selection_no ? player.selection_no + '. ' : '') + player.username
+                            + (player.id === myId ? ' (you)' : '')).appendTo($list);
                     });
                 }
 

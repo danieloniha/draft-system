@@ -101,7 +101,7 @@ class DraftEditingTest extends TestCase
     {
         $this->draft->update(['turn_started_at' => now()]);
 
-        $this->asHost()->get($this->editUrl())->assertForbidden();
+        $this->asHost()->get($this->editUrl())->assertRedirect(route('draft.details', $this->draft->id));
     }
 
     public function test_a_draft_that_already_has_selections_counts_as_started(): void
@@ -116,7 +116,7 @@ class DraftEditingTest extends TestCase
 
         $this->assertNull($this->draft->fresh()->turn_started_at);
         $this->assertTrue($this->draft->fresh()->hasStarted());
-        $this->asHost()->get($this->editUrl())->assertForbidden();
+        $this->asHost()->get($this->editUrl())->assertRedirect(route('draft.details', $this->draft->id));
     }
 
     public function test_a_draft_has_not_started_until_the_clock_runs_or_a_selection_exists(): void

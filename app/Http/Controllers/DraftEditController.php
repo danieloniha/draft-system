@@ -24,7 +24,13 @@ class DraftEditController extends Controller
     public function edit($draft_id)
     {
         $draft = Draft::with(['interests', 'teams.user', 'payoutTiers'])->findOrFail($draft_id);
-        $this->authorize('configure', $draft);
+        $this->authorize('manage', $draft);
+
+        // A started draft is fixed: say so on the details page instead of a bare 403.
+        if ($draft->hasStarted()) {
+            return redirect()->route('draft.details', ['draft_id' => $draft->id])
+                ->withErrors(['start' => 'This session has already started, so it can no longer be edited.']);
+        }
 
         // In order first, anyone not yet placed last.
         $teams = $draft->teams

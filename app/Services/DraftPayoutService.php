@@ -50,7 +50,8 @@ class DraftPayoutService implements DraftFlowService
         $playersByTeam = $teams->mapWithKeys(fn ($team) => [$team->id => [
             'id' => (int) $team->user_id,
             'username' => $team->user->username,
-            'selection_no' => (int) $team->selection_no,
+            // Under 'random' nobody has a number until the reveal; before that it is null.
+            'selection_no' => $team->selection_no === null ? null : (int) $team->selection_no,
         ]]);
 
         $results = $isStarted
@@ -68,6 +69,7 @@ class DraftPayoutService implements DraftFlowService
             'version' => ($isStarted ? 1 : 0),
             'starts_at' => $draft->start_date->toIso8601String(),
             'server_time' => now()->toIso8601String(),
+            'order_mode' => $draft->order_mode,
             'players' => $playersByTeam->values()->all(),
             'tier_count' => $tiers->count(),
             'layout' => $this->layout($draft, $teams, $tiers),
@@ -209,7 +211,13 @@ class DraftPayoutService implements DraftFlowService
     private function layout(Draft $draft, Collection $teams, Collection $tiers): string
     {
         $tierData = $tiers->map(fn ($tier) => [$tier->id, (int) $tier->rank_from, (int) $tier->rank_to, (int) $tier->amount]);
-        $players = $teams->map(fn ($team) => [(int) $team->user_id, $team->user->username, (int) $team->selection_no]);
+        // Under 'random' the numbers are handed out at the reveal, which the page shows live,
+        // so they are not part of what it is built from (else the reveal would reload the page).
+        $players = $teams->map(fn ($team) => [
+            (int) $team->user_id,
+            $team->user->username,
+            $draft->order_mode === 'random' ? null : (int) $team->selection_no,
+        ]);
 
         return md5(json_encode([$tierData->all(), $players->all()]));
     }

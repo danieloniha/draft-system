@@ -263,6 +263,8 @@ class DraftController extends Controller
         $validated = $request->validate([
             // Only asked of someone who is not logged in: the name their guest account gets.
             'username' => [Rule::requiredIf($user === null), 'nullable', 'string', 'max:50'],
+            // Everyone gives one: it is how the host reaches them.
+            'email' => ['required', 'email', 'max:255'],
         ]);
 
         try {
@@ -270,19 +272,22 @@ class DraftController extends Controller
                 // A draft that cannot be joined (closed, started, full) leaves no guest account behind.
                 $user = DB::transaction(function () use ($validated, $draft) {
                     $guest = User::createGuest($validated['username']);
-                    $this->join->joinPublic($draft, $guest);
+                    $this->join->joinPublic($draft, $guest, $validated['email']);
 
                     return $guest;
                 });
                 $this->signIn($request, $user);
             } else {
-                $this->join->joinPublic($draft, $user);
+                $this->join->joinPublic($draft, $user, $validated['email']);
             }
         } catch (HttpException $e) {
             // Not open, already started, or full: tell them why, on the same page.
             return redirect()->route('public.join.form', ['public_token' => $public_token])
                 ->withErrors(['join' => $e->getMessage()]);
         }
+
+        // Anyone already on the results page sees the new participant (and, under fcfs, their number).
+        $this->flowService($draft->fresh())->announce($draft->fresh());
 
         return redirect()->route('draft.details', ['draft_id' => $draft->id]);
     }

@@ -112,6 +112,22 @@ class DraftConfigurationTest extends TestCase
         $this->get(route('show.selection.order', $this->draft->id))->assertForbidden();
     }
 
+    public function test_inviting_a_participant_emails_them_their_link(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+
+        $this->actingAs($this->owner)
+            ->post(route('invite.teams', $this->draft->id), ['emails' => ['new@example.com']])
+            ->assertRedirect(route('invitations.sent', $this->draft->id));
+
+        $team = Team::where('email', 'new@example.com')->firstOrFail();
+
+        \Illuminate\Support\Facades\Mail::assertSent(
+            \App\Mail\DraftInvitation::class,
+            fn ($mail) => $mail->hasTo('new@example.com') && $mail->team->is($team)
+        );
+    }
+
     public function test_owner_can_add_participants_and_items(): void
     {
         $this->actingAs($this->owner)

@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\DraftInvitation;
 use App\Models\Draft;
 use App\Models\Team;
 use App\Services\DraftEditor;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 class TeamController extends Controller
 {
@@ -45,13 +49,44 @@ class TeamController extends Controller
 
         $editor->addParticipants($draft, $validated['emails']);
 
+        $failed = $this->sendInvitations($draft, $validated['emails']);
+        $mailNote = $failed
+            ? 'Some emails could not be sent (' . implode(', ', $failed) . '); share their links manually.'
+            : null;
+
         // The edit page invites people one at a time and comes straight back to itself.
         if (($validated['return_to'] ?? null) === 'edit') {
             return redirect()->route('draft.edit', ['draft_id' => $draft->id])
-                ->with('status', 'Invitation created. Their link is on the invitation links page.');
+                ->with('status', $mailNote ?? 'Invitation emailed. Their link is also on the invitation links page.');
         }
 
-        return redirect()->route('invitations.sent', ['draft_id' => $draft_id]);
+        return redirect()->route('invitations.sent', ['draft_id' => $draft_id])
+            ->with('status', $mailNote ?? 'Invitation emails sent.');
+    }
+
+    /**
+     * Email each newly invited person their link. A mail failure must not undo the invitation
+     * (the host can still copy the link), so failures are reported and returned instead of thrown.
+     *
+     * @return list<string> the emails that could not be sent
+     */
+    private function sendInvitations(Draft $draft, array $emails): array
+    {
+        $failed = [];
+        $teams = $draft->teams()->with('draft.creator')
+            ->whereIn(DB::raw('lower(email)'), array_map([Str::class, 'lower'], $emails))
+            ->get();
+
+        foreach ($teams as $team) {
+            try {
+                Mail::to($team->email)->send(new DraftInvitation($team));
+            } catch (Throwable $e) {
+                report($e);
+                $failed[] = $team->email;
+            }
+        }
+
+        return $failed;
     }
 
     public function showInvitationsSent($draft_id)

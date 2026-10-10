@@ -47,6 +47,9 @@
                 <thead>
                     <tr>
                         <th>Participant</th>
+                        @if ($isHost)
+                            <th>Email</th>
+                        @endif
                         <th>{{ $draft->isMoneyMode() ? 'Rank' : 'Selection Number' }}</th>
                     </tr>
                 </thead>
@@ -55,6 +58,9 @@
                         <tr>
                             {{-- Only the host sees the email of someone who has not joined yet. --}}
                             <td>{{ $team->user?->username ?? ($isHost ? $team->email : 'Invited (not joined yet)') }}</td>
+                            @if ($isHost)
+                                <td>{{ $team->email }}</td>
+                            @endif
                             <td>{{ $team->selection_no }}</td>
                         </tr>
                     @endforeach

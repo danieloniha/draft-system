@@ -49,7 +49,7 @@ class GuestPlayTest extends TestCase
     {
         $draft = $this->publicDraft();
 
-        $this->post(route('public.join', $draft->public_token), ['username' => 'Sam'])
+        $this->post(route('public.join', $draft->public_token), ['username' => 'Sam', 'email' => 'p@example.com'])
             ->assertRedirect(route('draft.details', $draft->id));
 
         $guest = User::where('username', 'Sam')->sole();
@@ -62,7 +62,7 @@ class GuestPlayTest extends TestCase
     public function test_the_guest_can_then_see_the_session_they_joined(): void
     {
         $draft = $this->publicDraft();
-        $this->post(route('public.join', $draft->public_token), ['username' => 'Sam']);
+        $this->post(route('public.join', $draft->public_token), ['username' => 'Sam', 'email' => 'p@example.com']);
 
         $this->get(route('draft.details', $draft->id))->assertOk()->assertSee('Sam');
         $this->getJson(route('draft.state', $draft->id))->assertStatus(422); // not ready to show, but allowed in
@@ -72,8 +72,8 @@ class GuestPlayTest extends TestCase
     {
         $draft = $this->publicDraft();
 
-        $this->post(route('public.join', $draft->public_token))->assertSessionHasErrors('username');
-        $this->post(route('public.join', $draft->public_token), ['username' => str_repeat('x', 51)])->assertSessionHasErrors('username');
+        $this->post(route('public.join', $draft->public_token), ['email' => 'p@example.com'])->assertSessionHasErrors('username');
+        $this->post(route('public.join', $draft->public_token), ['username' => str_repeat('x', 51), 'email' => 'p@example.com'])->assertSessionHasErrors('username');
 
         $this->assertSame(0, $this->guestCount());
         $this->assertSame(0, Team::count());
@@ -83,9 +83,9 @@ class GuestPlayTest extends TestCase
     {
         $draft = $this->publicDraft();
 
-        $this->post(route('public.join', $draft->public_token), ['username' => 'Sam']);
+        $this->post(route('public.join', $draft->public_token), ['username' => 'Sam', 'email' => 'p@example.com']);
         auth()->logout();
-        $this->post(route('public.join', $draft->public_token), ['username' => 'Sam']);
+        $this->post(route('public.join', $draft->public_token), ['username' => 'Sam', 'email' => 'p@example.com']);
 
         $this->assertSame(2, User::where('username', 'Sam')->count());
         $this->assertSame(2, Team::where('draft_id', $draft->id)->count());
@@ -97,10 +97,10 @@ class GuestPlayTest extends TestCase
         Team::factory()->create(['draft_id' => $full->id]);
         $started = $this->publicDraft(['turn_started_at' => now()]);
 
-        $this->post(route('public.join', $full->public_token), ['username' => 'Late'])
+        $this->post(route('public.join', $full->public_token), ['username' => 'Late', 'email' => 'p@example.com'])
             ->assertRedirect(route('public.join.form', $full->public_token))
             ->assertSessionHasErrors(['join' => 'This draft is full.']);
-        $this->post(route('public.join', $started->public_token), ['username' => 'Late'])
+        $this->post(route('public.join', $started->public_token), ['username' => 'Late', 'email' => 'p@example.com'])
             ->assertSessionHasErrors('join');
 
         $this->assertSame(0, $this->guestCount(), 'no stray guest accounts');
@@ -123,9 +123,9 @@ class GuestPlayTest extends TestCase
     {
         $draft = $this->publicDraft(['order_mode' => 'fcfs']);
 
-        $this->post(route('public.join', $draft->public_token), ['username' => 'First']);
+        $this->post(route('public.join', $draft->public_token), ['username' => 'First', 'email' => 'p@example.com']);
         auth()->logout();
-        $this->post(route('public.join', $draft->public_token), ['username' => 'Second']);
+        $this->post(route('public.join', $draft->public_token), ['username' => 'Second', 'email' => 'p@example.com']);
 
         $order = Team::where('draft_id', $draft->id)->orderBy('selection_no')->with('user')->get()->pluck('user.username')->all();
         $this->assertSame(['First', 'Second'], $order);
@@ -321,7 +321,7 @@ class GuestPlayTest extends TestCase
     public function test_a_guest_signing_up_keeps_the_seats_they_already_hold(): void
     {
         $draft = $this->publicDraft();
-        $this->post(route('public.join', $draft->public_token), ['username' => 'Sam']);
+        $this->post(route('public.join', $draft->public_token), ['username' => 'Sam', 'email' => 'p@example.com']);
         $guest = User::where('username', 'Sam')->sole();
         $usersBefore = User::count();
 
@@ -390,10 +390,10 @@ class GuestPlayTest extends TestCase
         $draft = $this->publicDraft();
 
         for ($i = 0; $i < 20; $i++) {
-            $this->post(route('public.join', $draft->public_token))->assertSessionHasErrors('username');
+            $this->post(route('public.join', $draft->public_token), ['email' => 'p@example.com'])->assertSessionHasErrors('username');
         }
 
-        $this->post(route('public.join', $draft->public_token), ['username' => 'Sam'])->assertStatus(429);
+        $this->post(route('public.join', $draft->public_token), ['username' => 'Sam', 'email' => 'p@example.com'])->assertStatus(429);
         $this->assertSame(0, $this->guestCount());
     }
 }

@@ -9,7 +9,10 @@
 <body>
     <div class="draft-details-container">
         <h1 class="form-title">Invitation links are ready</h1>
-        <p>Share the matching link with each participant. They'll need an account using the email address you invited &mdash; if they don't have one yet, they can sign up when they open the link.</p>
+        @if (session('status'))
+            <p class="notice" role="status">{{ session('status') }}</p>
+        @endif
+        <p>Each participant has been emailed their link; you can also share it yourself. They'll need an account using the email address you invited &mdash; if they don't have one yet, they can sign up when they open the link.</p>
 
         <div class="team-selection-container">
             <table>

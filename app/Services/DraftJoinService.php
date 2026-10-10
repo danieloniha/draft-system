@@ -48,9 +48,9 @@ class DraftJoinService
      * team row that represents them — their existing one, if they had already
      * joined, since joining twice is harmless, not an error.
      */
-    public function joinPublic(Draft $draft, User $user): Team
+    public function joinPublic(Draft $draft, User $user, ?string $contactEmail = null): Team
     {
-        return DB::transaction(function () use ($draft, $user) {
+        return DB::transaction(function () use ($draft, $user, $contactEmail) {
             $draft = Draft::whereKey($draft->id)->lockForUpdate()->firstOrFail();
 
             abort_unless($draft->isPublic(), 404, 'This draft is not open for anyone to join.');
@@ -67,7 +67,9 @@ class DraftJoinService
             $team = Team::create([
                 'draft_id' => $draft->id,
                 'user_id' => $user->id,
-                'email' => $user->email,
+                // The address the host reaches them on. Kept on the seat, not the account: a guest
+                // has no email of their own, and an account's login email must not change here.
+                'email' => $contactEmail ?? $user->email,
                 'selection_no' => null,
                 'token' => null,
             ]);

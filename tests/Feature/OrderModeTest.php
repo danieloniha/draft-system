@@ -45,8 +45,8 @@ class OrderModeTest extends TestCase
         $alice = User::factory()->create();
         $bob = User::factory()->create();
 
-        $this->actingAs($alice)->post(route('public.join', $draft->public_token));
-        $this->actingAs($bob)->post(route('public.join', $draft->public_token));
+        $this->actingAs($alice)->post(route('public.join', $draft->public_token), ['email' => 'p@example.com']);
+        $this->actingAs($bob)->post(route('public.join', $draft->public_token), ['email' => 'p@example.com']);
 
         $this->assertSame(1, Team::where('draft_id', $draft->id)->where('user_id', $alice->id)->sole()->selection_no);
         $this->assertSame(2, Team::where('draft_id', $draft->id)->where('user_id', $bob->id)->sole()->selection_no);

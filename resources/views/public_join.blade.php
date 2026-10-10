@@ -51,6 +51,15 @@
                 @endguest
 
                 <div class="form-group">
+                    <label for="email">Your email</label>
+                    <input type="email" id="email" name="email" value="{{ old('email', auth()->user()?->email) }}" maxlength="255" placeholder="you@example.com" required autocomplete="email">
+                    <p class="hint">The host uses this to reach you about the session.</p>
+                    @error('email')
+                        <p>{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div class="form-group">
                     <button type="submit" class="btn">Join this draft</button>
                 </div>
             </form>

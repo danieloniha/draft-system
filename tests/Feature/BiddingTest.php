@@ -417,7 +417,8 @@ class BiddingTest extends TestCase
         $this->startDraft();
 
         $this->assertTrue($this->draft->fresh()->hasStarted());
-        $this->actingAs($this->draft->creator)->get(route('draft.edit', $this->draft->id))->assertForbidden();
+        $this->actingAs($this->draft->creator)->get(route('draft.edit', $this->draft->id))
+            ->assertRedirect(route('draft.details', $this->draft->id));
     }
 
     public function test_hasStarted_also_recognises_a_draft_with_bids_recorded(): void

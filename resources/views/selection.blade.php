@@ -7,7 +7,10 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Item Selection</title>
     <link rel="stylesheet" href="{{ asset('/assets/style.css') }}">
-    @vite(['resources/js/app.js'])
+    {{-- Live updates need the built assets; without them the page still works by polling. --}}
+    @if (file_exists(public_path('hot')) || file_exists(public_path('build/manifest.json')))
+        @vite(['resources/js/app.js'])
+    @endif
 </head>
 
 <body>
