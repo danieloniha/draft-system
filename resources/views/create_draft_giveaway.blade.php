@@ -17,14 +17,12 @@
         @csrf
         <input type="hidden" name="type" value="giveaway">
 
-        <div class="form-group">
-            <label for="giveaway_mode">What Are You Giving Away?</label>
-            <select id="giveaway_mode" name="giveaway_mode" required>
-                <option value="items" selected>Items — participants take turns claiming them</option>
-                <option value="money">Money — you define who gets paid what</option>
-            </select>
-            <p class="hint">Money mode has no items to claim: instead you set up a payout table, and the reveal happens the moment you start.</p>
-        </div>
+        {{-- Chosen on the page before this one. --}}
+        <input type="hidden" id="giveaway_mode" name="giveaway_mode" value="{{ $mode }}">
+        <p class="pick-status">
+            Giving away: <strong>{{ $mode === 'money' ? 'Money' : 'Items' }}</strong>
+            &middot; <a href="{{ route('create.draft.giveaway.mode') }}">Change</a>
+        </p>
 
         <div class="form-group">
             <label for="name">Session Name</label>
@@ -42,11 +40,7 @@
                 <input type="number" id="no_interests" name="no_interests" placeholder="Enter number of items" min="1" required>
             </div>
 
-            <div class="form-group">
-                <label for="timer">Turn Timer (seconds)</label>
-                <input type="number" id="timer" name="timer" placeholder="Enter turn timer" min="1" required>
-                <p class="hint">How long each participant gets to make their pick.</p>
-            </div>
+            @include('partials.timer-input', ['label' => 'Turn Timer', 'hint' => 'How long each participant gets to make their pick.'])
         </div>
         <input type="hidden" id="no_interests_placeholder" name="no_interests" value="1" disabled>
         <input type="hidden" id="timer_placeholder" name="timer" value="1" disabled>
@@ -100,7 +94,7 @@
     const modeSelect = document.getElementById('giveaway_mode');
     const itemsOnlyFields = document.getElementById('items-only-fields');
     const noInterestsInput = document.getElementById('no_interests');
-    const timerInput = document.getElementById('timer');
+    const timerInputs = [document.getElementById('timer_minutes'), document.getElementById('timer_seconds')];
     const noInterestsPlaceholder = document.getElementById('no_interests_placeholder');
     const timerPlaceholder = document.getElementById('timer_placeholder');
     const orderModeHint = document.getElementById('order-mode-hint');
@@ -111,9 +105,8 @@
 
         itemsOnlyFields.style.display = isMoney ? 'none' : '';
         noInterestsInput.disabled = isMoney;
-        timerInput.disabled = isMoney;
+        timerInputs.forEach((input) => input.disabled = isMoney);
         noInterestsInput.required = !isMoney;
-        timerInput.required = !isMoney;
         noInterestsPlaceholder.disabled = !isMoney;
         timerPlaceholder.disabled = !isMoney;
 
@@ -123,7 +116,6 @@
         nextButton.textContent = isMoney ? 'Continue to Payout Tiers' : 'Continue to Items';
     }
 
-    modeSelect.addEventListener('change', applyGiveawayMode);
     applyGiveawayMode();
 
     // One field means two things depending on visibility: for Private it's literally how many

@@ -25,11 +25,20 @@
         <p id="pick-status" class="pick-status" role="status" aria-live="polite"></p>
     </div>
 
+    @include('partials.after-results')
+
     <div class="container">
         <div id="current-item-box" class="current-item-box box item-card">
-            <img id="current-item-image" src="" alt="" style="display:none">
+            <img id="current-item-image" src="" alt="" style="display:none" onerror="this.style.display='none'">
             <span id="current-item-name"></span>
         </div>
+
+        {{-- Host only: close the open item now rather than waiting for its timer. --}}
+        @can('start', $draft)
+            <div id="end-item-box" class="form-group" style="display:none">
+                <button type="button" class="btn-outline" id="end-item-button">End bidding on this item now</button>
+            </div>
+        @endcan
 
         <div id="bid-box" class="bid-box form-group">
             <label for="bid-amount">Your bid</label>
@@ -43,6 +52,9 @@
         <ul id="item-list">
             @foreach ($interests as $interest)
                 <li id="item-{{ $interest->id }}" data-item-id="{{ $interest->id }}">
+                    @if ($interest->image_path)
+                        <img class="thumb" src="{{ asset('storage/' . $interest->image_path) }}" alt="" onerror="this.style.display='none'">
+                    @endif
                     {{ $interest->name }}
                     <span class="current-pick-indicator"></span>
                 </li>
@@ -59,6 +71,9 @@
             const stateUrl = @json(route('draft.state', ['draft_id' => $draft->id]));
             const bidUrl = @json(route('place.bid', ['draft_id' => $draft->id]));
             const csrfToken = @json(csrf_token());
+            const endItemUrl = @json(route('end.item', ['draft_id' => $draft->id]));
+            const storageBase = @json(asset('storage'));
+            const isHost = @json(auth()->user()->can('start', $draft));
 
             // The server decides which item is open, the current leading bid and when time
             // runs out. This page only shows that state, so every update, whether from our own
@@ -90,6 +105,8 @@
             }
 
             function render() {
+                $('#after-results').toggle(state.status === 'complete');
+
                 if (state.status === 'complete') {
                     $('#turn-message').text('The auction is over.');
                 } else if (state.status === 'scheduled') {
@@ -103,7 +120,7 @@
                 if (state.current_item) {
                     $('#current-item-name').text(state.current_item.name);
                     if (state.current_item.image_path) {
-                        $('#current-item-image').attr('src', '/storage/' + state.current_item.image_path).show();
+                        $('#current-item-image').attr('src', storageBase + '/' + state.current_item.image_path).show();
                     } else {
                         $('#current-item-image').hide();
                     }
@@ -124,6 +141,7 @@
                     $('#last-pick').text('');
                 }
 
+                $('#end-item-box').toggle(isHost && state.status === 'in_progress' && !!state.current_item);
                 $('#bid-box').toggle(state.status === 'in_progress' && isParticipant && !!state.current_item);
                 $('#bid-amount').attr('min', state.current_bid ? state.current_bid.amount + 1 : 1);
 
@@ -239,6 +257,26 @@
                     .fail(function(xhr) {
                         setStatus((xhr.responseJSON && xhr.responseJSON.message) || 'That bid could not be placed.');
                         // Our view was out of date (someone else bid first, or the item moved on).
+                        resync();
+                    })
+                    .always(function() {
+                        pending = false;
+                    });
+            });
+
+            $('#end-item-button').on('click', function() {
+                if (pending || !confirm('End bidding on this item now? The highest bid wins it, or it goes unsold if nobody has bid.')) {
+                    return;
+                }
+
+                pending = true;
+                setStatus('');
+                $.ajax({ url: endItemUrl, method: 'POST', data: { _token: csrfToken } })
+                    .done(function(response) {
+                        applyState(response.state);
+                    })
+                    .fail(function(xhr) {
+                        setStatus((xhr.responseJSON && xhr.responseJSON.message) || 'That item could not be ended.');
                         resync();
                     })
                     .always(function() {

@@ -11,7 +11,7 @@
 
 <div class="template-container">
     <div class="template-box">
-        <a href="{{ route('create.draft.giveaway.form') }}">
+        <a href="{{ route('create.draft.giveaway.mode') }}">
             Giveaway
             <small>Participants take turns claiming items, one at a time, until none are left.</small>
         </a>

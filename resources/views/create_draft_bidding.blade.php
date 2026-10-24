@@ -32,11 +32,7 @@
             <input type="number" id="no_interests" name="no_interests" placeholder="Enter number of items" min="1" required>
         </div>
 
-        <div class="form-group">
-            <label for="timer">Bid Timer (seconds)</label>
-            <input type="number" id="timer" name="timer" placeholder="Enter bid timer" min="1" required>
-            <p class="hint">How long each item stays open for bids before it closes.</p>
-        </div>
+        @include('partials.timer-input', ['label' => 'Bid Timer', 'hint' => 'How long each item stays open for bids before it closes. You can also end an item early.'])
 
         <div class="form-group">
             <label for="start-date">Start Date & Time (your local time)</label>

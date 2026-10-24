@@ -49,7 +49,7 @@ class DraftTypeChooserTest extends TestCase
             ->assertOk()
             ->assertSee('Giveaway')
             ->assertSee('Bidding')
-            ->assertSee(route('create.draft.giveaway.form'))
+            ->assertSee(route('create.draft.giveaway.mode'))
             ->assertSee(route('create.draft.bidding.form'));
     }
 
@@ -61,7 +61,7 @@ class DraftTypeChooserTest extends TestCase
     public function test_the_giveaway_form_is_giveaway_specific(): void
     {
         $this->actingAs($this->owner)
-            ->get(route('create.draft.giveaway.form'))
+            ->get(route('create.draft.giveaway.form', ['mode' => 'items']))
             ->assertOk()
             ->assertSee('Create a Giveaway')
             ->assertSee('Turn Timer')
@@ -69,6 +69,31 @@ class DraftTypeChooserTest extends TestCase
             ->assertDontSee('Bid Timer')
             ->assertDontSee('Item Order')
             ->assertDontSee('<select id="type"', false);
+    }
+
+    public function test_the_giveaway_mode_page_offers_items_and_money_as_cards(): void
+    {
+        $this->actingAs($this->owner)
+            ->get(route('create.draft.giveaway.mode'))
+            ->assertOk()
+            ->assertSee(route('create.draft.giveaway.form', ['mode' => 'items']), false)
+            ->assertSee(route('create.draft.giveaway.form', ['mode' => 'money']), false)
+            ->assertSee('giveaway-items.jpg')
+            ->assertSee('giveaway-money.jpg')
+            ->assertDontSee('<select', false);
+    }
+
+    public function test_the_giveaway_form_carries_the_chosen_mode_and_needs_one(): void
+    {
+        $this->actingAs($this->owner)
+            ->get(route('create.draft.giveaway.form', ['mode' => 'money']))
+            ->assertOk()
+            ->assertSee('name="giveaway_mode" value="money"', false)
+            ->assertDontSee('<select id="giveaway_mode"', false);
+
+        $this->actingAs($this->owner)
+            ->get(route('create.draft.giveaway.form'))
+            ->assertRedirect(route('create.draft.giveaway.mode'));
     }
 
     public function test_the_bidding_form_is_bidding_specific(): void
@@ -86,7 +111,8 @@ class DraftTypeChooserTest extends TestCase
 
     public function test_both_forms_require_login(): void
     {
-        $this->get(route('create.draft.giveaway.form'))->assertRedirect(route('login'));
+        $this->get(route('create.draft.giveaway.mode'))->assertRedirect(route('login'));
+        $this->get(route('create.draft.giveaway.form', ['mode' => 'items']))->assertRedirect(route('login'));
         $this->get(route('create.draft.bidding.form'))->assertRedirect(route('login'));
     }
 

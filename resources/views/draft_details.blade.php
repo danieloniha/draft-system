@@ -36,7 +36,7 @@
             @endif
             <p><strong>Scheduled start:</strong> <time datetime="{{ $draft->start_date->toIso8601String() }}">{{ $draft->start_date->format('Y-m-d H:i') }} UTC</time></p>
             @unless ($draft->isMoneyMode())
-                <p><strong>Turn timer:</strong> {{ $draft->selection_time_limit }} seconds</p>
+                <p><strong>Turn timer:</strong> {{ $draft->timerLabel() }}</p>
             @endunless
         </div>
 

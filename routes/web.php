@@ -35,6 +35,7 @@ Route::middleware(['auth', 'account'])->group(function () {
     // Choosing a template comes first, as its own step — Giveaway and Bidding then get
     // their own dedicated creation forms, not one shared form with a type dropdown.
     Route::get('/view/draft', [DraftController::class, 'chooseType'])->name('view.draft');
+    Route::get('/create/draft/giveaway/mode', [DraftController::class, 'chooseGiveawayMode'])->name('create.draft.giveaway.mode');
     Route::get('/create/draft/giveaway', [DraftController::class, 'giveawayForm'])->name('create.draft.giveaway.form');
     Route::get('/create/draft/bidding', [DraftController::class, 'biddingForm'])->name('create.draft.bidding.form');
     Route::post('/create/draft', [DraftController::class, 'createDraft'])->name('create.draft');
@@ -70,6 +71,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/draft/{draft_id}/interests', [DraftController::class, 'storeInterests'])->name('store.interests');
     Route::post('/draft/{draft_id}/interest', [DraftController::class, 'selectInterest'])->name('select.interest');
     Route::post('/draft/{draft_id}/bid', [DraftController::class, 'placeBid'])->name('place.bid');
+    Route::post('/draft/{draft_id}/end-item', [DraftController::class, 'endItem'])->name('end.item');
     Route::get('/draft/{draft_id}/state', [DraftController::class, 'showState'])->middleware('throttle:120,1')->name('draft.state');
 });
 

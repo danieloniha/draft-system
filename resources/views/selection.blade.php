@@ -40,6 +40,8 @@
         </table>
     </div>
 
+    @include('partials.after-results')
+
     <div class="container item-grid" id="item-grid">
         @foreach ($interests as $interest)
             <div class="box item-card select-interest {{ in_array($interest->id, $state['selected_interest_ids']) ? 'blurred' : '' }}" id="interest-{{ $interest->id }}" data-id="{{ $interest->id }}"
@@ -151,7 +153,7 @@
             function renderResults() {
                 const done = state.status === 'complete';
                 $('#item-grid, #player-order').toggle(!done);
-                $('#results-panel').toggle(done);
+                $('#results-panel, #after-results').toggle(done);
                 if (!done) {
                     return;
                 }

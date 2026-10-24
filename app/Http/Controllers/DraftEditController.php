@@ -57,6 +57,8 @@ class DraftEditController extends Controller
 
     public function update(Request $request, $draft_id, DraftEditor $editor)
     {
+        $request->merge(['timer' => Draft::timerSecondsFrom($request->all())]);
+
         $draft = Draft::findOrFail($draft_id);
         $this->authorize('configure', $draft);
 

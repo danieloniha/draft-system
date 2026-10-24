@@ -32,9 +32,21 @@ class DraftController extends Controller
         return view('choose_draft_type');
     }
 
-    public function giveawayForm()
+    public function chooseGiveawayMode()
     {
-        return view('create_draft_giveaway');
+        return view('choose_giveaway_mode');
+    }
+
+    public function giveawayForm(Request $request)
+    {
+        $mode = $request->query('mode');
+
+        // The mode is picked on its own page first; arriving without one goes back there.
+        if (! in_array($mode, ['items', 'money'], true)) {
+            return redirect()->route('create.draft.giveaway.mode');
+        }
+
+        return view('create_draft_giveaway', ['mode' => $mode]);
     }
 
     public function biddingForm()
@@ -44,6 +56,8 @@ class DraftController extends Controller
 
     public function createDraft(Request $request)
     {
+        $request->merge(['timer' => Draft::timerSecondsFrom($request->all())]);
+
         //dd($request->all());
 
         $validated = $request->validate([
@@ -398,6 +412,21 @@ class DraftController extends Controller
             'message' => 'Bid placed successfully.',
             'state' => $state,
         ]);
+    }
+
+    /**
+     * Bidding only: the host closes the open item now instead of waiting out its timer.
+     */
+    public function endItem($draft_id)
+    {
+        $draft = Draft::findOrFail($draft_id);
+        $this->authorize('start', $draft);
+        abort_unless($draft->isBidding(), 404);
+
+        $this->bidding->endCurrentItem($draft);
+        $state = $this->bidding->state($draft);
+
+        return response()->json(['success' => true, 'state' => $state]);
     }
 
     private function isParticipant(Draft $draft): bool

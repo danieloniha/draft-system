@@ -236,6 +236,64 @@ class BiddingTest extends TestCase
 
     // ------------------------------------------------------------------ closing items
 
+    public function test_the_host_can_end_the_open_item_before_its_timer_runs_out(): void
+    {
+        $this->startDraft();
+        $this->bid($this->players[0], $this->items[0], 10)->assertOk();
+        $this->bid($this->players[1], $this->items[0], 25)->assertOk();
+
+        // Nowhere near the time limit: the host closes it anyway.
+        $this->actingAs($this->draft->creator)
+            ->postJson(route('end.item', $this->draft->id))
+            ->assertOk()
+            ->assertJsonPath('state.items_closed', 1)
+            ->assertJsonPath('state.last_closed.sold', true)
+            ->assertJsonPath('state.last_closed.winning_amount', 25)
+            ->assertJsonPath('state.current_item.id', $this->items[1]->id);
+
+        $this->assertSame(25, $this->items[0]->fresh()->winning_amount);
+    }
+
+    public function test_ending_an_item_with_no_bids_leaves_it_unsold(): void
+    {
+        $this->startDraft();
+
+        $this->actingAs($this->draft->creator)
+            ->postJson(route('end.item', $this->draft->id))
+            ->assertOk()
+            ->assertJsonPath('state.last_closed.sold', false);
+    }
+
+    public function test_only_the_host_can_end_an_item_and_only_while_one_is_open(): void
+    {
+        // Not started yet: nothing is open.
+        $this->actingAs($this->draft->creator)->postJson(route('end.item', $this->draft->id))->assertStatus(409);
+
+        $this->startDraft();
+
+        $this->actingAs($this->players[0])->postJson(route('end.item', $this->draft->id))->assertForbidden();
+        $this->assertNull($this->items[0]->fresh()->closed_at);
+    }
+
+    public function test_the_timer_can_be_given_as_minutes_and_seconds(): void
+    {
+        $this->actingAs($this->draft->creator)
+            ->patch(route('draft.update', $this->draft->id), [
+                'name' => $this->draft->name,
+                'type' => 'bidding',
+                'timer_minutes' => 2,
+                'timer_seconds' => 30,
+                'start_date' => $this->start->copy()->addDay()->format('Y-m-d\TH:i'),
+                'visibility' => $this->draft->visibility,
+                'order_mode' => $this->draft->order_mode,
+                'participant_limit' => 10,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(150, $this->draft->fresh()->selection_time_limit);
+        $this->assertSame('2 min 30 sec', $this->draft->fresh()->timerLabel());
+    }
+
     public function test_an_item_with_no_bids_goes_unsold_when_its_window_expires(): void
     {
         $this->startDraft();

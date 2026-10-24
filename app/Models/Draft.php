@@ -56,6 +56,38 @@ class Draft extends Model
         return $this->turn_started_at !== null || $this->selections()->exists() || $this->bids()->exists();
     }
 
+    /**
+     * The timer a host typed as minutes and seconds, as total seconds. Falls back to a plain
+     * 	imer (seconds) when neither part was sent, so older callers keep working.
+     */
+    public static function timerSecondsFrom(array $input): mixed
+    {
+        $hasParts = ($input['timer_minutes'] ?? '') !== '' || ($input['timer_seconds'] ?? '') !== '';
+        if (! $hasParts) {
+            return $input['timer'] ?? null;
+        }
+
+        $minutes = $input['timer_minutes'] ?? 0;
+        $seconds = $input['timer_seconds'] ?? 0;
+        if (! is_numeric($minutes) || ! is_numeric($seconds) || $minutes < 0 || $seconds < 0) {
+            return null;
+        }
+
+        return (int) $minutes * 60 + (int) $seconds;
+    }
+
+    /**
+     * The per-turn / per-item time as people read it: '2 min 30 sec', '45 sec'.
+     */
+    public function timerLabel(): string
+    {
+        $total = (int) $this->selection_time_limit;
+        $minutes = intdiv($total, 60);
+        $seconds = $total % 60;
+
+        return trim(($minutes ? $minutes . ' min ' : '') . ($seconds || ! $minutes ? $seconds . ' sec' : ''));
+    }
+
     public function isBidding(): bool
     {
         return $this->type === 'bidding';

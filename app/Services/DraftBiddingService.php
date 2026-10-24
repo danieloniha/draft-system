@@ -148,17 +148,43 @@ class DraftBiddingService implements DraftFlowService
      */
     public function advanceClock(Draft $draft): ?Interest
     {
-        if (! $this->clock->hasExpired($draft) || $this->isComplete($draft)) {
+        return $this->closeOpenItem($draft, force: false);
+    }
+
+    /**
+     * The host ends the open item now instead of waiting for its timer: same outcome as
+     * the timer running out (highest bid wins, or unsold), and the next item's clock starts.
+     * Who may do this is decided by DraftPolicy::start (the host). Returns the closed item.
+     */
+    public function endCurrentItem(Draft $draft): Interest
+    {
+        $closed = $this->closeOpenItem($draft, force: true);
+
+        abort_if($closed === null, 409, 'There is no item open for bidding right now.');
+
+        return $closed;
+    }
+
+    /**
+     * Close the open item, if there is one: when its time is up, or at once when $force is set.
+     */
+    private function closeOpenItem(Draft $draft, bool $force): ?Interest
+    {
+        $due = fn (Draft $d) => $d->turn_started_at !== null
+            && ! $this->isComplete($d)
+            && ($force || $this->clock->hasExpired($d));
+
+        if (! $due($draft)) {
             return null;
         }
 
         $closed = null;
 
-        $changed = DB::transaction(function () use ($draft, &$closed) {
+        $changed = DB::transaction(function () use ($draft, &$closed, $due) {
             // Same lock as placeBid(), so a close and a bid can never both apply to one item.
             $draft = Draft::whereKey($draft->id)->lockForUpdate()->firstOrFail();
 
-            if (! $this->clock->hasExpired($draft) || $this->isComplete($draft)) {
+            if (! $due($draft)) {
                 return false;
             }
 

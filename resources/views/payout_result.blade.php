@@ -35,6 +35,9 @@
         @endcan
     </div>
 
+    {{-- Once the results are in: a way out of this page. --}}
+    @include('partials.after-results')
+
     {{-- Random order only: a draw that plays out when the host reveals. --}}
     <div id="reveal-stage" class="current-player" style="display:none;">
         <p class="pick-status">Drawing the order&hellip;</p>
@@ -111,6 +114,7 @@
             // Names spin in a drum, then the ranks are announced from last to first.
             function playReveal() {
                 revealing = true;
+                $('#after-results').hide();
                 markSeen();
                 const names = state.results.map(function(r) { return r.player_username; });
                 const rows = state.results.slice().reverse();
@@ -132,6 +136,7 @@
                         if (i >= rows.length) {
                             clearInterval(next);
                             revealing = false;
+                            $('#after-results').show();
                             return;
                         }
                         // Newest (best) rank goes on top.
@@ -148,6 +153,8 @@
 
                 const complete = state.status === 'complete';
                 $('#host-controls').toggle(!complete);
+                // Held back while the random draw plays, so nobody leaves mid-reveal.
+                $('#after-results').toggle(complete && !revealing);
                 const me = state.players.find(function(p) { return p.id === myId; });
                 if (complete) {
                     $('#my-number').text('');

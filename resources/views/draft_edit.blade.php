@@ -61,11 +61,11 @@
                     <input type="text" id="title" name="title" value="{{ old('title', $draft->title) }}" maxlength="255">
                 </div>
 
-                <div class="form-group">
-                    <label for="timer">{{ $draft->type === 'bidding' ? 'Bid timer (seconds)' : 'Turn timer (seconds)' }}</label>
-                    <input type="number" id="timer" name="timer" min="1" value="{{ old('timer', $draft->selection_time_limit) }}" required>
-                    <p class="hint">{{ $draft->type === 'bidding' ? 'How long each item stays open for bids.' : 'How long each participant gets to make their pick.' }}</p>
-                </div>
+                @include('partials.timer-input', [
+                    'label' => $draft->type === 'bidding' ? 'Bid timer' : 'Turn timer',
+                    'hint' => $draft->type === 'bidding' ? 'How long each item stays open for bids.' : 'How long each participant gets to make their pick.',
+                    'total' => $draft->selection_time_limit,
+                ])
 
                 <div class="form-group">
                     <label for="start_date">Scheduled start (your local time)</label>

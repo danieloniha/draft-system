@@ -294,6 +294,7 @@ class GuestPlayTest extends TestCase
 
         foreach ([
             fn () => $this->actingAs($guest)->get(route('view.draft')),
+            fn () => $this->actingAs($guest)->get(route('create.draft.giveaway.mode')),
             fn () => $this->actingAs($guest)->get(route('create.draft.giveaway.form')),
             fn () => $this->actingAs($guest)->get(route('create.draft.bidding.form')),
             fn () => $this->actingAs($guest)->post(route('create.draft'), ['name' => 'x']),
