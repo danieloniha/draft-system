@@ -203,7 +203,8 @@ class DraftTimerTest extends TestCase
         $this->startDraft()->assertSessionHasErrors(['start' => 'Every invited participant must join before picking starts.']);
 
         $lastTeam->update(['user_id' => $this->players[2]->id, 'selection_no' => null]);
-        $this->startDraft()->assertSessionHasErrors(['start' => 'Every participant must have a selection order before picking starts.']);
+        // Everyone has joined now, so the host is asked for the order instead.
+        $this->startDraft()->assertRedirect(route('show.selection.order', ['draft_id' => $this->draft->id, 'start' => 1]));
 
         $this->assertNull($this->draft->fresh()->turn_started_at);
     }

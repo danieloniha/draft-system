@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="{{ asset('/assets/style.css') }}">
 </head>
 <body>
+    @include('partials.app-nav', ['back' => route('draft.details', ['draft_id' => ($draft->id ?? $draft_id ?? 0)]), 'backLabel' => 'Session details'])
     @php
         // What would stop the host starting right now (the same rules as starting).
         $blockers = collect([

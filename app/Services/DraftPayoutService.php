@@ -6,7 +6,9 @@ use App\Events\DraftStateChanged;
 use App\Models\Draft;
 use App\Models\PayoutTier;
 use App\Models\Team;
+use App\Models\WalletTransaction;
 use App\Services\Contracts\DraftFlowService;
+use App\Services\Payments\WalletService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -23,6 +25,10 @@ use Throwable;
  */
 class DraftPayoutService implements DraftFlowService
 {
+    public function __construct(private WalletService $wallet)
+    {
+    }
+
     /**
      * The state everyone sees: before start, just the participant count and
      * how many payout tiers the host has set up; after start, the full
@@ -54,12 +60,19 @@ class DraftPayoutService implements DraftFlowService
             'selection_no' => $team->selection_no === null ? null : (int) $team->selection_no,
         ]]);
 
+        // Who has had their prize added to their wallet (settle() does it as the draft starts),
+        // so the results page only says so for money that is really there.
+        $credited = $isStarted
+            ? WalletTransaction::where('draft_id', $draft->id)->where('type', 'prize')->pluck('user_id')->all()
+            : [];
+
         $results = $isStarted
             ? $teams->values()->map(fn ($team, $index) => [
                 'rank' => $index + 1,
                 'player_id' => $playersByTeam[$team->id]['id'],
                 'player_username' => $playersByTeam[$team->id]['username'],
                 'amount' => $this->amountForRank($tiers, $index + 1),
+                'credited' => in_array($team->user_id, $credited, true),
             ])->all()
             : [];
 
@@ -119,6 +132,8 @@ class DraftPayoutService implements DraftFlowService
             }
             $this->assertReady($teams, $draft);
 
+            $this->settle($draft, $teams);
+
             $draft->update(['turn_started_at' => now()]);
 
             return true;
@@ -126,6 +141,43 @@ class DraftPayoutService implements DraftFlowService
 
         if ($started) {
             $this->broadcast($this->state($draft));
+        }
+    }
+
+    /**
+     * Move the money, inside start()'s transaction so a failure leaves the draft unstarted and
+     * every balance untouched: the host's wallet must cover the whole budget (or, with none set,
+     * every tier in full); that is held, each participant is credited what their rank pays, and
+     * whatever was not paid out goes back to the host. Ledger references are per draft, so a
+     * replay can never pay twice.
+     */
+    private function settle(Draft $draft, Collection $teams): void
+    {
+        $tiers = $this->tiers($draft);
+        $host = $draft->creator;
+
+        $held = $draft->payout_budget ?? (int) $tiers->sum(
+            fn (PayoutTier $tier) => ($tier->rank_to - $tier->rank_from + 1) * $tier->amount
+        );
+
+        if ($held > (int) $host->balance) {
+            $short = $held - (int) $host->balance;
+            abort(422, "Your wallet is short by {$short} to cover this giveaway. Add funds to your wallet, then reveal the results.");
+        }
+
+        $this->wallet->debit($host, $held, 'escrow', "escrow:{$draft->id}", $draft->id);
+
+        $paid = 0;
+        foreach ($teams->values() as $index => $team) {
+            $amount = $this->amountForRank($tiers, $index + 1);
+            if ($amount > 0) {
+                $this->wallet->credit($team->user, $amount, 'prize', "prize:{$draft->id}:{$team->id}", $draft->id);
+                $paid += $amount;
+            }
+        }
+
+        if ($held > $paid) {
+            $this->wallet->credit($host, $held - $paid, 'refund', "refund:{$draft->id}", $draft->id);
         }
     }
 

@@ -9,6 +9,7 @@
 </head>
 
 <body>
+    @include('partials.app-nav')
 
     <div class="form-container">
         <h2 class="form-title">Add Players</h2>

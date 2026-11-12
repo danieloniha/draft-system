@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{{ asset('/assets/style.css') }}">
 </head>
 <body>
+    @include('partials.app-nav')
     <div class="form-container">
         <h2 class="form-title">Session Created Successfully</h2>
         <p>
@@ -14,6 +15,18 @@
                 ? 'Nobody sees the results until you, as the host, start the draft from the session details page.'
                 : 'Nobody can pick until you, as the host, start the draft from the session details page.' }}
         </p>
+
+        @php($needsOrder = $draft->type === 'giveaway' && $draft->order_mode === 'host_decided' && $draft->teams()->whereNull('selection_no')->exists())
+        @if ($needsOrder)
+            <p class="notice" role="status">
+                You decide the order, and not everyone has a number yet.
+                @if ($draft->isPublic())
+                    People can only be ordered once they have joined, so you will set the order when you press Start Draft.
+                @else
+                    <a href="{{ route('show.selection.order', ['draft_id' => $draft->id]) }}">Set the order now</a>
+                @endif
+            </p>
+        @endif
 
         @if ($draft->isPublic())
             @php($joinLink = route('public.join.form', ['public_token' => $draft->public_token]))

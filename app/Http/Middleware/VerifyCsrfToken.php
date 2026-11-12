@@ -12,6 +12,7 @@ class VerifyCsrfToken extends Middleware
      * @var array<int, string>
      */
     protected $except = [
-        //
+        // Server-to-server from Bachs; authenticated by its signature instead.
+        'webhooks/bachs',
     ];
 }

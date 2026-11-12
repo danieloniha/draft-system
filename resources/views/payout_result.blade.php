@@ -14,6 +14,7 @@
 </head>
 
 <body>
+    @include('partials.app-nav', ['back' => route('draft.details', ['draft_id' => ($draft->id ?? $draft_id ?? 0)]), 'backLabel' => 'Session details'])
 
     <div id="current-player" class="current-player">
         <h2 id="status-message"></h2>
@@ -23,12 +24,18 @@
         <p id="reveal-timer" class="pick-status"></p>
         <p id="my-number" class="pick-status"></p>
 
+        {{-- A winner's prize, shown once the draft is done and the money is in their wallet. --}}
+        <div id="prize-banner" class="notice" role="status" style="display:none;">
+            <p id="prize-text"></p>
+            <a class="btn start-btn" href="{{ route('wallet.show') }}">View my wallet</a>
+        </div>
+
         {{-- The host reveals from here too, not only from the details page. --}}
         @can('start', $draft)
             <div id="host-controls" class="form-group">
                 <form action="{{ route('start.draft', ['draft_id' => $draft->id]) }}" method="POST" style="display:inline">
                     @csrf
-                    <button type="submit" class="btn start-btn">Reveal Results</button>
+                    <button type="submit" class="btn start-btn">Start Draft</button>
                 </form>
                 <a class="btn-outline" href="{{ route('draft.edit', ['draft_id' => $draft->id]) }}">Edit session</a>
             </div>
@@ -148,6 +155,9 @@
 
                 const complete = state.status === 'complete';
                 $('#host-controls').toggle(!complete);
+                if (!complete) {
+                    $('#prize-banner').hide();
+                }
                 const me = state.players.find(function(p) { return p.id === myId; });
                 if (complete) {
                     $('#my-number').text('');
@@ -188,6 +198,13 @@
                             '</tr>').appendTo($body);
                     });
                     $('#results-table').show();
+
+                    const mine = state.results.find(function(row) { return row.player_id === myId; });
+                    if (mine && mine.amount > 0 && mine.credited) {
+                        $('#prize-text').text('Congratulations! You won ₦' + mine.amount.toLocaleString()
+                            + '. It has been added to your wallet.');
+                        $('#prize-banner').show();
+                    }
                 } else {
                     $('#list-title').text('Participants');
                     $('#results-table').hide();

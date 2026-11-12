@@ -15,6 +15,17 @@ class TrustProxies extends Middleware
     protected $proxies;
 
     /**
+     * Behind a tunnel or load balancer (ngrok, a hosting proxy) the app only sees plain HTTP
+     * unless it trusts the proxy's X-Forwarded-* headers; without that, asset and route URLs come
+     * out as http:// on an https:// page and browsers block them. Set TRUSTED_PROXIES to '*' (or
+     * a comma-separated list of IPs); unset, no proxy is trusted.
+     */
+    protected function proxies()
+    {
+        return config('app.trusted_proxies');
+    }
+
+    /**
      * The headers that should be used to detect proxies.
      *
      * @var int

@@ -66,6 +66,18 @@ class User extends Authenticatable
         return $this->hasMany(Team::class);
     }
 
+    public function walletTransactions() {
+        return $this->hasMany(WalletTransaction::class);
+    }
+
+    public function withdrawals() {
+        return $this->hasMany(Withdrawal::class);
+    }
+
+    public function payoutDestinations() {
+        return $this->hasMany(PayoutDestination::class);
+    }
+
     public function createdDrafts() {
         return $this->hasMany(Draft::class);
     }

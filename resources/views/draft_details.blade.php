@@ -8,14 +8,34 @@
     <link rel="stylesheet" href="{{ asset('/assets/style.css') }}">
 </head>
 <body>
+    @include('partials.app-nav')
     @php
         $isHost = auth()->user()->can('manage', $draft);
         $isParticipant = $teams->contains('user_id', auth()->id());
         $hasStarted = $draft->turn_started_at !== null;
+        // A money giveaway can only be started with its budget in the host's wallet.
+        $walletShort = $isHost && ! $hasStarted && $draft->isMoneyMode()
+            ? max(0, (int) $draft->payout_budget - (int) auth()->user()->balance)
+            : 0;
     @endphp
 
     <div class="draft-details-container">
         <h2 class="form-title">Session Details</h2>
+
+        {{-- Host-decided order: nobody can be revealed/picked until every participant has a number. --}}
+        @if ($isHost && ! $hasStarted && $draft->type === 'giveaway' && $draft->order_mode === 'host_decided' && $teams->isNotEmpty() && $teams->contains(fn ($team) => is_null($team->selection_no)))
+            <p class="notice" role="status">
+                You decide the order, and not everyone has a number yet. Pressing Start Draft will ask you for it.
+                <a href="{{ route('show.selection.order', ['draft_id' => $draft->id]) }}">Set the order now</a>
+            </p>
+        @endif
+
+        @if ($walletShort > 0)
+            <p class="notice notice-error" role="alert">
+                Your wallet is ₦{{ number_format($walletShort) }} short of the ₦{{ number_format($draft->payout_budget) }} you are giving away.
+                <a href="{{ route('draft.continue-setup', ['draft_id' => $draft->id]) }}">Add money</a>
+            </p>
+        @endif
 
         {{-- Why the draft could not be started, or why the picking page could not be shown yet. --}}
         @if ($errors->has('start'))
@@ -81,17 +101,18 @@
             @if ($isHost && ! $hasStarted)
                 <form action="{{ route('start.draft', ['draft_id' => $draft->id]) }}" method="POST">
                     @csrf
-                    <button type="submit" class="btn start-btn">{{ $draft->isMoneyMode() ? 'Reveal Results' : 'Start Draft' }}</button>
+                    <button type="submit" class="btn start-btn">Start Draft</button>
                 </form>
                 <a class="btn start-btn" href="{{ route('draft.edit', ['draft_id' => $draft->id]) }}">Edit session</a>
             @endif
 
-            @if ($isParticipant || $isHost)
+            {{-- The host starts from the button above; once it has started, everyone gets the live page. --}}
+            @if ($isParticipant || ($isHost && $hasStarted))
                 <a class="btn start-btn" href="{{ route('show.interests', ['draft_id' => $draft->id]) }}">
                     @if ($draft->isMoneyMode())
-                        {{ $isParticipant ? 'Go to results page' : 'Watch the draft' }}
+                        Go to results page
                     @else
-                        {{ $isParticipant ? ('Go to ' . ($draft->type === 'bidding' ? 'bidding' : 'picking') . ' page') : 'Watch the draft' }}
+                        Go to {{ $draft->type === 'bidding' ? 'bidding' : 'picking' }} page
                     @endif
                 </a>
             @endif

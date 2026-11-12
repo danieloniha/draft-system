@@ -109,13 +109,13 @@ class MoneySplitFlowTest extends TestCase
         $this->assertNull($draft->fresh()->turn_started_at);
     }
 
-    public function test_host_decided_requires_the_host_to_set_the_rank_order_before_starting(): void
+    public function test_host_decided_asks_the_host_to_set_the_rank_order_when_starting(): void
     {
         [$draft] = $this->buildMoneyDraft(3, null, ['order_mode' => 'host_decided']);
         Team::where('draft_id', $draft->id)->update(['selection_no' => null]);
 
         $this->actingAs($draft->creator)->post(route('start.draft', $draft->id))
-            ->assertSessionHasErrors(['start' => 'Every participant must have a selection order before this draft can start.']);
+            ->assertRedirect(route('show.selection.order', ['draft_id' => $draft->id, 'start' => 1]));
         $this->assertNull($draft->fresh()->turn_started_at);
     }
 

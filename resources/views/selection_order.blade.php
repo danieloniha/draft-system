@@ -9,12 +9,20 @@
 </head>
 
 <body>
+    @include('partials.app-nav')
 
     <div class="form-container">
         <h2 class="form-title">Assign Selection Numbers</h2>
 
-        <!-- Form to submit selection numbers -->
-        <form method="POST" action="{{ route('store.selection.order', ['draft_id' => $draft_id]) }}">
+        @if ($startMode)
+            <p>Everyone who has joined is listed. Give each person a number, then start the draft.</p>
+        @endif
+        @if ($errors->any())
+            <p class="notice notice-error" role="alert">{{ $errors->first() }}</p>
+        @endif
+
+        <!-- Form to submit selection numbers (from Start Draft, the same post also starts the draft) -->
+        <form method="POST" action="{{ $startMode ? route('start.draft', ['draft_id' => $draft_id]) : route('store.selection.order', ['draft_id' => $draft_id]) }}">
             @csrf
 
             @php
@@ -42,7 +50,7 @@
             @endforeach
 
             <div class="form-group">
-                <button type="submit" class="btn">Submit Selection Order</button>
+                <button type="submit" class="btn">{{ $startMode ? 'Save order and start draft' : 'Submit Selection Order' }}</button>
             </div>
         </form>
     </div>

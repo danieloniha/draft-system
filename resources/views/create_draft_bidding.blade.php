@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="{{ asset('/assets/style.css') }}">
 </head>
 <body>
+    @include('partials.app-nav')
 
 <div class="form-container">
     <h2 class="form-title">Create a Bidding Auction</h2>

@@ -14,6 +14,7 @@
 </head>
 
 <body>
+    @include('partials.app-nav', ['back' => route('draft.details', ['draft_id' => ($draft->id ?? $draft_id ?? 0)]), 'backLabel' => 'Session details'])
 
     <div id="current-player" class="current-player">
         <h2 id="turn-message"></h2>

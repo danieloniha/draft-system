@@ -58,10 +58,37 @@ class DraftTypeChooserTest extends TestCase
         $this->get(route('view.draft'))->assertRedirect(route('login'));
     }
 
-    public function test_the_giveaway_form_is_giveaway_specific(): void
+    public function test_the_giveaway_link_first_asks_whether_it_is_items_or_money(): void
     {
         $this->actingAs($this->owner)
             ->get(route('create.draft.giveaway.form'))
+            ->assertOk()
+            ->assertSee('What are you giving away?')
+            ->assertSee(route('create.draft.giveaway.form', ['mode' => 'items']), false)
+            ->assertSee(route('create.draft.giveaway.form', ['mode' => 'money']), false)
+            ->assertSee('giveaway-items.svg', false)
+            ->assertSee('giveaway-money.svg', false)
+            ->assertDontSee('Session Name');
+
+        $this->actingAs($this->owner)
+            ->get(route('create.draft.giveaway.form', ['mode' => 'bogus']))
+            ->assertOk()
+            ->assertSee('What are you giving away?');
+    }
+
+    public function test_the_money_form_carries_the_chosen_mode(): void
+    {
+        $this->actingAs($this->owner)
+            ->get(route('create.draft.giveaway.form', ['mode' => 'money']))
+            ->assertOk()
+            ->assertSee('name="giveaway_mode" value="money"', false)
+            ->assertSee('Session Name');
+    }
+
+    public function test_the_giveaway_form_is_giveaway_specific(): void
+    {
+        $this->actingAs($this->owner)
+            ->get(route('create.draft.giveaway.form', ['mode' => 'items']))
             ->assertOk()
             ->assertSee('Create a Giveaway')
             ->assertSee('Turn Timer')

@@ -85,6 +85,10 @@ trait BuildsDrafts
     {
         $draft = Draft::factory()->create(['type' => 'giveaway', 'giveaway_mode' => 'money', ...$attributes]);
 
+        // The host's wallet must cover the payouts to reveal, so a built draft starts out funded.
+        // A test about an unfunded host sets the balance back down.
+        User::whereKey($draft->user_id)->update(['balance' => 1_000_000]);
+
         // range(1, 0) descends to [1, 0] rather than being empty, so guard $players = 0 explicitly.
         $participants = collect($players > 0 ? range(1, $players) : [])->map(function (int $selectionNo) use ($draft) {
             $user = User::factory()->create();

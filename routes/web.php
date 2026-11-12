@@ -6,6 +6,8 @@ use App\Http\Controllers\DraftController;
 use App\Http\Controllers\DraftEditController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TeamController;
+use App\Http\Controllers\WalletController;
+use App\Http\Controllers\BachsWebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -40,7 +42,20 @@ Route::middleware(['auth', 'account'])->group(function () {
     Route::post('/create/draft', [DraftController::class, 'createDraft'])->name('create.draft');
 });
 
-Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
+// Anyone can see their balance (a guest winner included); adding money and withdrawing need an
+// account, which for a guest is the sign-up that keeps their balance.
+Route::middleware('auth')->get('/wallet', [WalletController::class, 'show'])->name('wallet.show');
+Route::middleware(['auth', 'account:wallet'])->group(function () {
+    Route::post('/wallet/fund', [WalletController::class, 'fund'])->middleware('throttle:10,1')->name('wallet.fund');
+    Route::post('/wallet/destinations', [WalletController::class, 'storeDestination'])->middleware('throttle:10,1')->name('wallet.destinations.store');
+    Route::delete('/wallet/destinations/{destination_id}', [WalletController::class, 'destroyDestination'])->name('wallet.destinations.destroy');
+    Route::post('/wallet/withdraw', [WalletController::class, 'withdraw'])->middleware('throttle:10,1')->name('wallet.withdraw');
+});
+
+// Called by Bachs, not a browser: no session, CSRF-exempt, verified by signature.
+Route::post('/webhooks/bachs', BachsWebhookController::class)->name('webhooks.bachs');
+
+Route::post('/logout',[AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
 // A private invitation needs an account (its token is tied to the invited email address), so
 // someone opening the link is sent to log in or sign up and then carried on to it. A guest —
@@ -63,7 +78,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/draft/{draft_id}/payout-tiers', [DraftController::class, 'showPayoutTiersForm'])->name('add.payout-tiers.form');
     Route::post('/draft/{draft_id}/payout-tiers', [DraftController::class, 'storePayoutTiers'])->name('store.payout-tiers');
 
-    Route::get('/draft/{draft_id}/details', [DraftController::class, 'showDraftDetails'])->name('draft.details');
+    Route::get('/draft/{draft_id}/continue-setup', [DraftController::class, 'continueSetup'])->name('draft.continue-setup');
+
+    Route::get('/draft/{draft_id}/details',[DraftController::class, 'showDraftDetails'])->name('draft.details');
     Route::post('/draft/{draft_id}/start', [DraftController::class, 'startDraft'])->name('start.draft');
 
     Route::get('/draft/{draft_id}/interests', [DraftController::class, 'showInterests'])->name('show.interests');

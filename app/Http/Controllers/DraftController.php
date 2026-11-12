@@ -32,9 +32,16 @@ class DraftController extends Controller
         return view('choose_draft_type');
     }
 
-    public function giveawayForm()
+    public function giveawayForm(Request $request)
     {
-        return view('create_draft_giveaway');
+        $mode = $request->query('mode');
+
+        // First ask what is being given away; the form only appears once that is chosen.
+        if (! in_array($mode, ['items', 'money'], true)) {
+            return view('choose_giveaway_mode');
+        }
+
+        return view('create_draft_giveaway', ['mode' => $mode]);
     }
 
     public function biddingForm()
@@ -144,6 +151,36 @@ class DraftController extends Controller
         if (($validated['return_to'] ?? null) === 'edit') {
             return redirect()->route('draft.edit', ['draft_id' => $draft->id])->with('status', 'Payout tiers added.');
         }
+
+        return $this->continueOrFund($draft);
+    }
+
+    /**
+     * The giveaway's money has to be in the host's wallet before the session goes any further.
+     * Continuing is the same link whether they were already covered or have just topped up.
+     */
+    public function continueSetup($draft_id)
+    {
+        $draft = Draft::findOrFail($draft_id);
+        $this->authorize('configure', $draft);
+
+        return $this->continueOrFund($draft);
+    }
+
+    private function continueOrFund(Draft $draft)
+    {
+        // The editor saved the budget on its own locked copy of the draft, so read it afresh.
+        $draft->refresh();
+        $short = (int) $draft->payout_budget - (int) $draft->creator()->value('balance');
+
+        if ($draft->isMoneyMode() && $short > 0) {
+            session(['setup_draft' => $draft->id]);
+
+            // No flash message: the wallet page's funding banner already says what is needed.
+            return redirect()->route('wallet.show');
+        }
+
+        session()->forget('setup_draft');
 
         return $this->afterItemsStep($draft);
     }
@@ -302,10 +339,25 @@ class DraftController extends Controller
         return view('draft_details', compact('draft', 'teams'));
     }
 
-    public function startDraft($draft_id)
+    public function startDraft(Request $request, $draft_id, DraftEditor $editor)
     {
         $draft = Draft::findOrFail($draft_id);
         $this->authorize('start', $draft);
+
+        // When the host decides the order, it can only be set once people have joined, which for a
+        // public session is only by now. So starting asks for it: first the order page, which then
+        // sends the numbers back here to be saved and the draft started in one step.
+        if ($this->needsOrder($draft)) {
+            if (! $request->filled('selection_numbers')) {
+                return redirect()->route('show.selection.order', ['draft_id' => $draft->id, 'start' => 1]);
+            }
+
+            $request->validate([
+                'selection_numbers' => ['array'],
+                'selection_numbers.*' => ['required', 'integer', 'min:1'],
+            ]);
+            $editor->setOrder($draft, $request->input('selection_numbers'));
+        }
 
         try {
             $this->flowService($draft)->start($draft);
@@ -317,6 +369,19 @@ class DraftController extends Controller
 
         // The host watches from the live page, whether or not they are picking/bidding too.
         return redirect()->route('show.interests', ['draft_id' => $draft->id]);
+    }
+
+    /**
+     * A Giveaway where the host decides the order and at least one participant has no number yet.
+     * Not while an invited person still hasn't joined: that is the first thing to tell the host
+     * (start() says so), before asking them to number people who may still change.
+     */
+    private function needsOrder(Draft $draft): bool
+    {
+        return $draft->type === 'giveaway'
+            && $draft->order_mode === 'host_decided'
+            && $draft->teams()->whereNull('selection_no')->exists()
+            && ! $draft->teams()->whereNull('user_id')->exists();
     }
 
     public function showInterests($draft_id)

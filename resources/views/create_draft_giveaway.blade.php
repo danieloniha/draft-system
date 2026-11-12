@@ -8,23 +8,21 @@
     <link rel="stylesheet" href="{{ asset('/assets/style.css') }}">
 </head>
 <body>
+    @include('partials.app-nav')
 
 <div class="form-container">
     <h2 class="form-title">Create a Giveaway</h2>
-    <p>Participants take turns claiming items, one at a time, until none are left.</p>
+    <p>{{ $mode === 'money' ? 'You set a payout table, and the winners are revealed live when you start.' : 'Participants take turns claiming items, one at a time, until none are left.' }}</p>
 
     <form method="POST" action="{{ route('create.draft') }}" id="game-config-form" enctype="multipart/form-data">
         @csrf
         <input type="hidden" name="type" value="giveaway">
 
-        <div class="form-group">
-            <label for="giveaway_mode">What Are You Giving Away?</label>
-            <select id="giveaway_mode" name="giveaway_mode" required>
-                <option value="items" selected>Items — participants take turns claiming them</option>
-                <option value="money">Money — you define who gets paid what</option>
-            </select>
-            <p class="hint">Money mode has no items to claim: instead you set up a payout table, and the reveal happens the moment you start.</p>
-        </div>
+        <input type="hidden" id="giveaway_mode" name="giveaway_mode" value="{{ $mode }}">
+        <p class="mode-chosen">
+            Giving away: <strong>{{ $mode === 'money' ? 'Money' : 'Items' }}</strong>
+            <a href="{{ route('create.draft.giveaway.form') }}">Change</a>
+        </p>
 
         <div class="form-group">
             <label for="name">Session Name</label>
@@ -123,7 +121,6 @@
         nextButton.textContent = isMoney ? 'Continue to Payout Tiers' : 'Continue to Items';
     }
 
-    modeSelect.addEventListener('change', applyGiveawayMode);
     applyGiveawayMode();
 
     // One field means two things depending on visibility: for Private it's literally how many

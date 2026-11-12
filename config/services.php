@@ -31,4 +31,14 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'bachs' => [
+        'key' => env('BACHS_API_KEY', env('BACHS_API_SANDBOX_KEY')),
+        'base_url' => env('BACHS_BASE_URL', 'https://sandbox-api.bachs.io'),
+        'webhook_secret' => env('BACHS_WEBHOOK_SECRET'),
+        'currency' => 'NGN',
+        // Bachs refuses localhost/private addresses for checkout return URLs, so in local
+        // development set this to a public (e.g. tunnel) URL. Defaults to this app's wallet page.
+        'return_url' => env('BACHS_RETURN_URL'),
+    ],
+
 ];

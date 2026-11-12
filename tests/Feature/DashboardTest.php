@@ -46,7 +46,8 @@ class DashboardTest extends TestCase
             ->assertSee('Not started')
             ->assertSee(route('draft.details', $draft->id))
             ->assertSee(route('show.interests', $draft->id))
-            ->assertSee('Watch');
+            ->assertSee('Start Draft')
+            ->assertDontSee('Watch');
     }
 
     public function test_a_participant_sees_the_sessions_they_are_in(): void

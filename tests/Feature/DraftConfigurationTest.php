@@ -350,12 +350,13 @@ class DraftConfigurationTest extends TestCase
         $participant = User::factory()->create();
         $this->teamFor($participant, 1);
 
-        // The host is not a participant here: they start the draft and can watch it.
+        // The host is not a participant here: they start the draft, and there is nothing to
+        // "watch" yet, so no second link competes with the Start Draft button.
         $this->actingAs($this->owner)
             ->get(route('draft.details', $this->draft->id))
             ->assertOk()
             ->assertSee('Start Draft')
-            ->assertSee('Watch the draft')
+            ->assertDontSee('Watch the draft')
             ->assertDontSee('Go to picking page');
 
         $this->actingAs($participant)

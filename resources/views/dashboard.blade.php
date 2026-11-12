@@ -34,6 +34,9 @@
         <div class="draft-box">
             <a href="{{ route('join.draft.form') }}">Join a session</a>
         </div>
+        <div class="draft-box">
+            <a href="{{ route('wallet.show') }}">Wallet (₦{{ number_format(Auth::user()->balance) }})</a>
+        </div>
     </div>
 
     <div class="container team-selection-container">
@@ -75,7 +78,7 @@
                                     <a href="{{ route('draft.edit', ['draft_id' => $draft->id]) }}">Edit</a>
                                     &middot;
                                 @endif
-                                <a href="{{ route('show.interests', ['draft_id' => $draft->id]) }}">{{ $isParticipant ? ($draft->isMoneyMode() ? 'Results page' : ($draft->type === 'bidding' ? 'Bidding page' : 'Picking page')) : 'Watch' }}</a>
+                                <a href="{{ route('show.interests', ['draft_id' => $draft->id]) }}">{{ $isParticipant ? ($draft->isMoneyMode() ? 'Results page' : ($draft->type === 'bidding' ? 'Bidding page' : 'Picking page')) : ($draft->turn_started_at ? 'Live page' : 'Start Draft') }}</a>
                             </td>
                         </tr>
                     @endforeach

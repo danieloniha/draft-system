@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 220" role="img" aria-label="Naira banknotes and coins">
+  <rect width="400" height="220" fill="#e8f7ef"/>
+  <ellipse cx="200" cy="196" rx="170" ry="12" fill="#c4e8d4"/>
+  <!-- back note -->
+  <g transform="rotate(-8 190 110)">
+    <rect x="95" y="52" width="200" height="104" rx="9" fill="#5dbb8a"/>
+    <rect x="105" y="62" width="180" height="84" rx="6" fill="none" stroke="#e8f7ef" stroke-width="2" stroke-dasharray="5 4"/>
+  </g>
+  <!-- front note -->
+  <g transform="rotate(5 200 120)">
+    <rect x="105" y="70" width="200" height="104" rx="9" fill="#2fb27a"/>
+    <rect x="115" y="80" width="180" height="84" rx="6" fill="none" stroke="#e8f7ef" stroke-width="2"/>
+    <circle cx="205" cy="122" r="30" fill="#e8f7ef"/>
+    <text x="205" y="136" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="40" font-weight="700" fill="#1f8a5c">&#8358;</text>
+    <circle cx="136" cy="100" r="7" fill="#e8f7ef"/>
+    <circle cx="274" cy="144" r="7" fill="#e8f7ef"/>
+  </g>
+  <!-- coins -->
+  <g>
+    <circle cx="68" cy="166" r="26" fill="#ffd166" stroke="#e0a82e" stroke-width="4"/>
+    <text x="68" y="177" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="30" font-weight="700" fill="#b8801a">&#8358;</text>
+    <circle cx="336" cy="170" r="22" fill="#ffd166" stroke="#e0a82e" stroke-width="4"/>
+    <text x="336" y="180" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="25" font-weight="700" fill="#b8801a">&#8358;</text>
+  </g>
+</svg>

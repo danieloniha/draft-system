@@ -106,8 +106,10 @@ class TeamController extends Controller
         // Fetch all teams for the given draft
         $teams = Team::where('draft_id', $draft_id)->with('user')->get();
 
-        // Pass the teams and the draft ID to the view
-        return view('selection_order', compact('teams', 'draft_id'));
+        // From Start Draft: the same form, but saving the order also starts the draft.
+        $startMode = request()->boolean('start');
+
+        return view('selection_order', compact('teams', 'draft_id', 'startMode'));
     }
 
     public function storeSelectionOrder(Request $request, $draft_id, DraftEditor $editor)

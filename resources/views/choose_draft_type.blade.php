@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="{{ asset('/assets/style.css') }}">
 </head>
 <body>
+    @include('partials.app-nav')
 
 <div class="template-container">
     <div class="template-box">

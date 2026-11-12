@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{{ asset('/assets/style.css') }}">
 </head>
 <body>
+    @include('partials.app-nav')
     <div class="draft-details-container">
         <h1 class="form-title">Invitation links are ready</h1>
         @if (session('status'))

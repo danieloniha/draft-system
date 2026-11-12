@@ -22,6 +22,7 @@ class EnsureUserHasAccount
             // guest() remembers where they were headed, so signing up carries on to it.
             return redirect()->guest(route('register'))->with('status', match ($for) {
                 'private' => 'Private sessions need an account. Sign up with the email address you were invited on to join.',
+                'wallet' => 'Create an account to add money or withdraw. Your winnings stay on your balance and carry over when you sign up.',
                 default => 'Create an account to host your own session. Joining a public one never needs an account.',
             });
         }
